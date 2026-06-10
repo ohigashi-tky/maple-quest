@@ -1,0 +1,32 @@
+{
+  "name": "Maple Quest - 縦画面アクションRPG",
+  "short_name": "Maple Quest",
+  "description": "可愛い2Dドット絵の横スクロールアクションRPG。スマホ縦画面に最適化。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0a18",
+  "theme_color": "#1a1430",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
