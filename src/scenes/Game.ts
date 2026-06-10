@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import {
   CHARACTERS, ENEMIES, BOSSES, STAGES, GROUND_Y, WORLD_H,
-  expForLevel, statMul, saveStage, newProgress,
-  type CharKey, type EnemyDef, type BossDef, type Progress, type StageDef,
+  expForLevel, statMul, saveStage, newProgress, tierFor, tierIndexFor,
+  type CharKey, type EnemyDef, type BossDef, type Progress, type StageDef, type JobTier,
 } from '../data';
 import { sfx, playBgm, stopBgm } from '../audio';
 import type HudScene from './Hud';
@@ -18,6 +18,8 @@ export interface PadState {
 export interface UiState {
   charKey: CharKey;
   charName: string;
+  spriteKey: string;
+  otherSpriteKey: string;
   hp: number; maxhp: number;
   mp: number; maxmp: number;
   level: number;
@@ -212,11 +214,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private buildPlayer() {
-    const charKey = this.progress.charKey;
-    this.player = this.physics.add.sprite(48, GROUND_Y - 30, `${charKey}_0`);
+    this.player = this.physics.add.sprite(48, GROUND_Y - 30, `${this.spriteKey}_0`);
     this.player.setSize(10, 20).setOffset(3, 3);
     this.player.setCollideWorldBounds(true);
-    this.player.play(`${charKey}_stand`);
+    this.player.play(`${this.spriteKey}_stand`);
     this.player.setDepth(10);
     this.physics.world.setBounds(0, -40, this.stage.width, WORLD_H + 40);
   }
@@ -248,9 +249,12 @@ export default class GameScene extends Phaser.Scene {
 
   private buildUiState() {
     const def = CHARACTERS[this.progress.charKey];
+    const tier = this.jobTier;
     this.uiState = {
       charKey: def.key,
-      charName: def.name,
+      charName: tier.jobName,
+      spriteKey: tier.spriteKey,
+      otherSpriteKey: this.otherCharSpriteKey(),
       hp: this.progress.chars[def.key].hp,
       maxhp: this.maxHp(def.key),
       mp: this.progress.chars[def.key].mp,
@@ -263,7 +267,7 @@ export default class GameScene extends Phaser.Scene {
       kills: this.stageKills,
       quota: this.stage.quota,
       boss: null,
-      skills: def.skills.map((s) => ({ name: s.name, label: s.label, mp: s.mp, cdLeft: 0, cd: s.cd })),
+      skills: tier.skills.map((s) => ({ name: s.name, label: s.label, mp: s.mp, cdLeft: 0, cd: s.cd })),
       switchCdLeft: 0,
       otherCharKey: def.key === 'warrior' ? 'mage' : 'warrior',
       gameOver: false,
@@ -280,13 +284,24 @@ export default class GameScene extends Phaser.Scene {
     return Math.floor(CHARACTERS[key].maxmp * statMul(this.progress.level));
   }
   private atk() {
-    return CHARACTERS[this.progress.charKey].atk * statMul(this.progress.level);
+    return CHARACTERS[this.progress.charKey].atk * statMul(this.progress.level) * this.jobTier.atkBonus;
   }
   private get charDef() {
     return CHARACTERS[this.progress.charKey];
   }
   private get charState() {
     return this.progress.chars[this.progress.charKey];
+  }
+  // 現在のレベルで適用される転職ティア
+  private get jobTier(): JobTier {
+    return tierFor(this.charDef, this.progress.level);
+  }
+  private get spriteKey(): string {
+    return this.jobTier.spriteKey;
+  }
+  private otherCharSpriteKey(): string {
+    const other: CharKey = this.progress.charKey === 'warrior' ? 'mage' : 'warrior';
+    return tierFor(CHARACTERS[other], this.progress.level).spriteKey;
   }
 
   // ============================================================
@@ -488,8 +503,7 @@ export default class GameScene extends Phaser.Scene {
 
   doSkill(i: number) {
     if (this.over || this.transitioning) return;
-    const def = this.charDef;
-    const skill = def.skills[i];
+    const skill = this.jobTier.skills[i];
     if (!skill) return;
     const now = this.time.now;
     if (now < this.skillCdAt[i]) return;
@@ -503,25 +517,26 @@ export default class GameScene extends Phaser.Scene {
     this.playAttackAnim();
     this.skillNameFx(skill.name);
 
-    switch (skill.id) {
-      case 'power':
+    switch (skill.kind) {
+      case 'melee':
         sfx('slash');
-        this.meleeFx(1.4);
-        this.meleeHit(36, 1.7, 2);
+        this.meleeFx(1.2 + skill.mult * 0.2);
+        this.meleeHit(skill.range ?? 36, skill.mult, skill.hits ?? 1);
         break;
-      case 'blast': {
+      case 'aoe': {
         sfx('rush');
         this.cameras.main.shake(120, 0.004);
+        const radius = skill.radius ?? 64;
         const ring = this.add.circle(this.player.x, this.player.y, 10, 0xffe45a, 0.35).setDepth(11);
         this.tweens.add({
-          targets: ring, radius: 60, alpha: 0, duration: 280,
+          targets: ring, radius: radius - 4, alpha: 0, duration: 280,
           onUpdate: () => ring.setRadius(ring.radius),
           onComplete: () => ring.destroy(),
         });
         for (const e of this.enemies.getChildren() as EnemySprite[]) {
           if (!e.active || e.dying) continue;
-          if (Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y) < 64) {
-            this.hitEnemy(e, 2.2, 1);
+          if (Phaser.Math.Distance.Between(this.player.x, this.player.y, e.x, e.y) < radius) {
+            this.hitEnemy(e, skill.mult, skill.hits ?? 1);
           }
         }
         break;
@@ -539,7 +554,7 @@ export default class GameScene extends Phaser.Scene {
               if (!e.active || e.dying || hitDone.has(e)) continue;
               if (Math.abs(e.x - this.player.x) < 26 && Math.abs(e.y - this.player.y) < 30) {
                 hitDone.add(e);
-                this.hitEnemy(e, 1.8, 1);
+                this.hitEnemy(e, skill.mult, 1);
               }
             }
           },
@@ -547,23 +562,24 @@ export default class GameScene extends Phaser.Scene {
         this.time.delayedCall(400, () => ev.remove());
         break;
       }
-      case 'fire':
+      case 'projectile':
         sfx('fire');
-        this.shoot('fx_fire_0', 240, 2.0, true, 260);
+        this.shoot('fx_fire_0', skill.speed ?? 240, skill.mult, skill.pierce ?? true, 260, 0.8 + skill.mult * 0.2);
         break;
       case 'thunder': {
         sfx('thunder');
         this.cameras.main.shake(160, 0.005);
+        const range = skill.range ?? 110;
         const candidates = (this.enemies.getChildren() as EnemySprite[])
-          .filter((e) => e.active && !e.dying && Math.abs(e.x - this.player.x) < 110 && Math.abs(e.y - this.player.y) < 90)
+          .filter((e) => e.active && !e.dying && Math.abs(e.x - this.player.x) < range && Math.abs(e.y - this.player.y) < 90)
           .sort((a, b2) => Math.abs(a.x - this.player.x) - Math.abs(b2.x - this.player.x))
-          .slice(0, 4);
+          .slice(0, skill.targets ?? 4);
         candidates.forEach((e, idx) => {
           this.time.delayedCall(idx * 90, () => {
             if (!e.active) return;
             const bolt = this.add.image(e.x, e.y - 30, 'fx_bolt_0').setDepth(12).setScale(1, 2.4).setOrigin(0.5, 0);
             this.tweens.add({ targets: bolt, alpha: 0, duration: 280, onComplete: () => bolt.destroy() });
-            this.hitEnemy(e, 2.4, 1);
+            this.hitEnemy(e, skill.mult, 1);
           });
         });
         if (candidates.length === 0) {
@@ -576,7 +592,7 @@ export default class GameScene extends Phaser.Scene {
       }
       case 'heal': {
         sfx('heal');
-        const healed = Math.floor(this.maxHp(this.progress.charKey) * 0.4);
+        const healed = Math.floor(this.maxHp(this.progress.charKey) * (skill.healPct ?? 0.4));
         this.charState.hp = Math.min(this.charState.hp + healed, this.maxHp(this.progress.charKey));
         this.floatText(this.player.x, this.player.y - 26, `+${healed}`, '#6ae45a');
         const fx = this.add.sprite(this.player.x, this.player.y - 10, 'fx_heal_0').setDepth(12);
@@ -623,8 +639,8 @@ export default class GameScene extends Phaser.Scene {
     // 交代エフェクト
     const fx = this.add.circle(this.player.x, this.player.y, 16, 0xffffff, 0.7).setDepth(12);
     this.tweens.add({ targets: fx, radius: 30, alpha: 0, duration: 300, onUpdate: () => fx.setRadius(fx.radius), onComplete: () => fx.destroy() });
-    this.player.setTexture(`${other}_0`);
-    this.player.play(`${other}_stand`);
+    this.player.setTexture(`${this.spriteKey}_0`);
+    this.player.play(`${this.spriteKey}_stand`);
     this.buildUiState();
     this.hud()?.refreshSkillButtons();
   }
@@ -633,7 +649,7 @@ export default class GameScene extends Phaser.Scene {
   // 攻撃処理
   // ============================================================
   private playAttackAnim() {
-    const key = this.progress.charKey;
+    const key = this.spriteKey;
     this.player.play(`${key}_attack`, true);
     this.time.delayedCall(260, () => {
       if (this.player.anims.currentAnim?.key === `${key}_attack`) {
@@ -675,13 +691,14 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  private shoot(tex: string, speed: number, mult: number, pierce: boolean, rangeMs: number) {
+  private shoot(tex: string, speed: number, mult: number, pierce: boolean, rangeMs: number, scale = 1) {
     const shot = this.playerShots.create(
       this.player.x + this.facing * 10, this.player.y - 4, tex
     ) as Phaser.Physics.Arcade.Sprite & { mult: number; pierce: boolean; hitSet: Set<EnemySprite> };
     shot.setVelocityX(this.facing * speed);
     shot.setFlipX(this.facing < 0);
     shot.setDepth(11);
+    shot.setScale(scale);
     shot.mult = mult;
     shot.pierce = pierce;
     shot.hitSet = new Set();
@@ -860,6 +877,7 @@ export default class GameScene extends Phaser.Scene {
     this.progress.kills++;
     this.progress.exp += exp;
     this.floatText(this.player.x, this.player.y - 36, `+${exp} EXP`, '#c8a4ff');
+    const tierBefore = tierIndexFor(this.charDef, this.progress.level);
     let next = expForLevel(this.progress.level);
     while (this.progress.exp >= next) {
       this.progress.exp -= next;
@@ -879,6 +897,41 @@ export default class GameScene extends Phaser.Scene {
       const ring = this.add.circle(this.player.x, this.player.y, 6, 0xffe45a, 0.6).setDepth(11);
       this.tweens.add({ targets: ring, radius: 44, alpha: 0, duration: 600, onUpdate: () => ring.setRadius(ring.radius), onComplete: () => ring.destroy() });
     }
+    const tierAfter = tierIndexFor(this.charDef, this.progress.level);
+    if (tierAfter > tierBefore) this.jobAdvance();
+  }
+
+  // 転職演出: 見た目・スキルが切り替わる
+  private jobAdvance() {
+    const tier = this.jobTier;
+    this.skillCdAt = [0, 0, 0];
+    sfx('portal');
+    sfx('levelup');
+
+    // 光の柱 + リング
+    const pillar = this.add.rectangle(this.player.x, this.player.y - 30, 26, 110, 0xffffff, 0.85).setDepth(13);
+    this.tweens.add({ targets: pillar, alpha: 0, scaleX: 2.2, duration: 900, ease: 'Cubic.easeOut', onComplete: () => pillar.destroy() });
+    for (let i = 0; i < 3; i++) {
+      const ring = this.add.circle(this.player.x, this.player.y, 6, 0xffd24a, 0.7).setDepth(13);
+      this.tweens.add({
+        targets: ring, radius: 56 + i * 16, alpha: 0, duration: 700, delay: i * 150,
+        onUpdate: () => ring.setRadius(ring.radius), onComplete: () => ring.destroy(),
+      });
+    }
+    this.cameras.main.flash(500, 255, 244, 200);
+
+    // 新しい見た目に切り替え
+    this.player.setTexture(`${tier.spriteKey}_0`);
+    this.player.play(`${tier.spriteKey}_stand`, true);
+
+    const t = this.add.text(this.player.x, this.player.y - 52, `${tier.rankName}転職!`, {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '13px',
+      color: '#ffd24a', stroke: '#7a4a21', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(20).setResolution(4);
+    this.tweens.add({ targets: t, y: t.y - 26, alpha: 0, duration: 1800, onComplete: () => t.destroy() });
+
+    this.hud()?.showBanner(`${tier.rankName}転職! 「${tier.jobName}」にジョブアップ!`, '#ffd24a');
+    this.buildUiState();
   }
 
   private floatText(x: number, y: number, msg: string, color: string, big = false) {
@@ -948,7 +1001,7 @@ export default class GameScene extends Phaser.Scene {
     const animKey = this.player.anims.currentAnim?.key ?? '';
     if (!animKey.endsWith('_attack')) {
       const moving = left || right;
-      const want = `${this.progress.charKey}_${moving ? 'walk' : 'stand'}`;
+      const want = `${this.spriteKey}_${moving ? 'walk' : 'stand'}`;
       if (animKey !== want) this.player.play(want, true);
     }
 
@@ -1075,10 +1128,13 @@ export default class GameScene extends Phaser.Scene {
 
   private syncUiState() {
     const def = this.charDef;
+    const tier = this.jobTier;
     const ui = this.uiState;
     const now = this.time.now;
     ui.charKey = def.key;
-    ui.charName = def.name;
+    ui.charName = tier.jobName;
+    ui.spriteKey = tier.spriteKey;
+    ui.otherSpriteKey = this.otherCharSpriteKey();
     ui.hp = Math.ceil(this.charState.hp);
     ui.maxhp = this.maxHp(def.key);
     ui.mp = Math.floor(this.charState.mp);
@@ -1093,7 +1149,7 @@ export default class GameScene extends Phaser.Scene {
     ui.boss = this.boss && this.boss.active
       ? { name: this.boss.def.name, title: (this.boss.def as BossDef).title, hp: Math.max(0, this.boss.hp), max: this.boss.maxhp }
       : null;
-    ui.skills = def.skills.map((s, i) => ({
+    ui.skills = tier.skills.map((s, i) => ({
       name: s.name, label: s.label, mp: s.mp,
       cdLeft: Math.max(0, this.skillCdAt[i] - now), cd: s.cd,
     }));

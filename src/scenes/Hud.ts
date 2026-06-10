@@ -118,9 +118,9 @@ export default class HudScene extends Phaser.Scene {
     this.hpText.setText(`${ui.hp}/${ui.maxhp}`);
     this.mpText.setText(`${ui.mp}/${ui.maxmp}`);
     this.lvText.setText(`Lv.${ui.level} ${ui.charName}`);
-    const tex = `${ui.charKey}_0`;
+    const tex = `${ui.spriteKey}_0`;
     if (this.portraitIcon.texture.key !== tex) this.portraitIcon.setTexture(tex);
-    const otherTex = `${ui.otherCharKey}_0`;
+    const otherTex = `${ui.otherSpriteKey}_0`;
     if (this.switchIcon && this.switchIcon.texture.key !== otherTex) this.switchIcon.setTexture(otherTex);
   }
 
@@ -219,8 +219,8 @@ export default class HudScene extends Phaser.Scene {
       c.on('pointerupoutside', off);
       return c;
     };
-    mk(64, 858, true, 'left');
-    mk(174, 858, false, 'right');
+    mk(64, VIEW_H - 102, true, 'left');
+    mk(174, VIEW_H - 102, false, 'right');
   }
 
   // ============================================================
@@ -294,19 +294,19 @@ export default class HudScene extends Phaser.Scene {
     const game = () => this.game_;
 
     // ジャンプ(青・大)
-    this.makeButton(478, 738, { r: 42, color: 0x3a7fd6, label: 'ジャンプ' }, () => game().doJump());
+    this.makeButton(478, VIEW_H - 222, { r: 42, color: 0x3a7fd6, label: 'ジャンプ' }, () => game().doJump());
     // 攻撃(オレンジ・特大)連打対応
-    this.makeButton(458, 862, { r: 56, color: 0xff8a2a, label: '攻撃' }, () => game().doAttack(), true);
+    this.makeButton(458, VIEW_H - 98, { r: 56, color: 0xff8a2a, label: '攻撃' }, () => game().doAttack(), true);
 
     // スキル3つ(攻撃ボタンの周りに扇状配置)
-    const skillPos: [number, number][] = [[338, 902], [318, 812], [360, 728]];
+    const skillPos: [number, number][] = [[338, VIEW_H - 58], [318, VIEW_H - 148], [360, VIEW_H - 232]];
     this.skillBtns = skillPos.map(([x, y], i) =>
       this.makeButton(x, y, { r: 36, color: 0x8a5ac4, label: '-', sub: '' }, () => game().doSkill(i))
     );
 
     // 回復薬
-    this.potionHpBtn = this.makeButton(252, 752, { r: 31, color: 0xc43a4a, icon: 'potion_hp_0', sub: '0' }, () => game().usePotion('hp'));
-    this.potionMpBtn = this.makeButton(252, 676, { r: 31, color: 0x3a4ac4, icon: 'potion_mp_0', sub: '0' }, () => game().usePotion('mp'));
+    this.potionHpBtn = this.makeButton(252, VIEW_H - 208, { r: 31, color: 0xc43a4a, icon: 'potion_hp_0', sub: '0' }, () => game().usePotion('hp'));
+    this.potionMpBtn = this.makeButton(252, VIEW_H - 284, { r: 31, color: 0x3a4ac4, icon: 'potion_mp_0', sub: '0' }, () => game().usePotion('mp'));
 
     // キャラ交代(ステータスパネルの下)
     this.switchBtn = this.makeButton(48, 152, { r: 28, color: 0x4aa84a, label: '' }, () => game().switchChar());
@@ -353,47 +353,49 @@ export default class HudScene extends Phaser.Scene {
 
   showGameOver(onRevive: () => void) {
     this.clearOverlay();
+    const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(100);
-    const dim = this.add.rectangle(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, 0x000000, 0.72).setInteractive();
-    const title = this.add.text(VIEW_W / 2, 320, 'GAME OVER', {
+    const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x000000, 0.72).setInteractive();
+    const title = this.add.text(VIEW_W / 2, cy - 160, 'GAME OVER', {
       fontFamily: '"Arial Black", sans-serif', fontSize: '56px',
       color: '#ff5a5a', stroke: '#3d0a0a', strokeThickness: 10,
     }).setOrigin(0.5).setResolution(2);
-    const subtitle = this.add.text(VIEW_W / 2, 386, '勇者たちは力尽きた…', {
+    const subtitle = this.add.text(VIEW_W / 2, cy - 94, '勇者たちは力尽きた…', {
       fontFamily: 'sans-serif', fontSize: '22px', color: '#ffd8d8',
     }).setOrigin(0.5).setResolution(2);
     c.add([dim, title, subtitle]);
-    c.add(this.makeOverlayButton(VIEW_W / 2, 500, 'このステージから復活', 0xff8a2a, () => {
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 20, 'このステージから復活', 0xff8a2a, () => {
       this.clearOverlay();
       onRevive();
     }));
-    c.add(this.makeOverlayButton(VIEW_W / 2, 600, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 120, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
     this.overlay = c;
   }
 
   showClear(stats: { level: number; kills: number; time: number }) {
     this.clearOverlay();
     sfx('levelup');
+    const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(100);
-    const dim = this.add.rectangle(VIEW_W / 2, VIEW_H / 2, VIEW_W, VIEW_H, 0x0a0a20, 0.82).setInteractive();
-    const title = this.add.text(VIEW_W / 2, 270, 'GAME CLEAR!', {
+    const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x0a0a20, 0.82).setInteractive();
+    const title = this.add.text(VIEW_W / 2, cy - 210, 'GAME CLEAR!', {
       fontFamily: '"Arial Black", sans-serif', fontSize: '54px',
       color: '#ffd24a', stroke: '#7a4a21', strokeThickness: 10,
     }).setOrigin(0.5).setResolution(2);
-    const sub = this.add.text(VIEW_W / 2, 336, '闇に堕ちた女帝を解放した!\nきのこ島に平和が戻った 🎉', {
+    const sub = this.add.text(VIEW_W / 2, cy - 144, '闇に堕ちた女帝を解放した!\nきのこ島に平和が戻った 🎉', {
       fontFamily: 'sans-serif', fontSize: '22px', color: '#ffffff', align: 'center',
     }).setOrigin(0.5).setResolution(2);
     const m = Math.floor(stats.time / 60), s = stats.time % 60;
-    const statsText = this.add.text(VIEW_W / 2, 440,
+    const statsText = this.add.text(VIEW_W / 2, cy - 40,
       `とうたつレベル: Lv.${stats.level}\nモンスター討伐数: ${stats.kills}体\nクリアタイム: ${m}分${s}秒`, {
         fontFamily: 'sans-serif', fontSize: '24px', color: '#cfe0ff', align: 'center', lineSpacing: 10,
       }).setOrigin(0.5).setResolution(2);
     // 主役たちのドット絵
-    const w = this.add.sprite(VIEW_W / 2 - 60, 580, 'warrior_0').setScale(4);
-    const mg = this.add.sprite(VIEW_W / 2 + 60, 580, 'mage_0').setScale(4).setFlipX(true);
+    const w = this.add.sprite(VIEW_W / 2 - 60, cy + 100, 'warrior_0').setScale(4);
+    const mg = this.add.sprite(VIEW_W / 2 + 60, cy + 100, 'mage_0').setScale(4).setFlipX(true);
     this.tweens.add({ targets: [w, mg], y: '-=14', duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     c.add([dim, title, sub, statsText, w, mg]);
-    c.add(this.makeOverlayButton(VIEW_W / 2, 700, 'タイトルへもどる', 0xffb347, () => this.toTitle()));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 220, 'タイトルへもどる', 0xffb347, () => this.toTitle()));
     this.overlay = c;
   }
 

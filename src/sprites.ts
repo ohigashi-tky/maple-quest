@@ -1142,22 +1142,131 @@ const SPRITES: Record<string, SpriteDef> = {
   cloud: CLOUD,
 };
 
+interface Layer {
+  rows: string[];
+  palette: Palette;
+}
+
 function drawGrid(scene: Phaser.Scene, key: string, rows: string[], palette: Palette) {
-  const w = Math.max(...rows.map((r) => r.length));
-  const h = rows.length;
+  drawLayers(scene, key, [{ rows, palette }]);
+}
+
+// 複数レイヤー(マント=下層、王冠=上層など)を1枚のテクスチャに合成する
+function drawLayers(scene: Phaser.Scene, key: string, layers: Layer[]) {
+  const w = Math.max(...layers.flatMap((l) => l.rows.map((r) => r.length)));
+  const h = Math.max(...layers.map((l) => l.rows.length));
   const tex = scene.textures.createCanvas(key, w, h)!;
   const ctx = tex.getContext();
-  for (let y = 0; y < h; y++) {
-    const row = rows[y];
-    for (let x = 0; x < row.length; x++) {
-      const c = palette[row[x]];
-      if (!c) continue;
-      ctx.fillStyle = c;
-      ctx.fillRect(x, y, 1, 1);
+  for (const layer of layers) {
+    for (let y = 0; y < layer.rows.length; y++) {
+      const row = layer.rows[y];
+      for (let x = 0; x < row.length; x++) {
+        const c = layer.palette[row[x]];
+        if (!c) continue;
+        ctx.fillStyle = c;
+        ctx.fillRect(x, y, 1, 1);
+      }
     }
   }
   tex.refresh();
 }
+
+// ---------- 転職後の装飾レイヤー ----------
+// マント(キャラの背中側 = 下層に描画)
+const CAPE_ROWS = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '..cc............',
+  '.cccc...........',
+  '.cccc...........',
+  '.ccccc..........',
+  '.ccccc..........',
+  '..cccc..........',
+  '..ccccc.........',
+  '..ccccc.........',
+  '...cccc.........',
+  '...ccc..........',
+  '................',
+];
+
+// 王冠(頭の上 = 上層に描画)
+const CROWN_ROWS = [
+  '.....g..g.g.....',
+  '.....gggggg.....',
+];
+
+// 帽子の星(魔法使い2次用・上層)
+const STAR_ROWS = [
+  '................',
+  '................',
+  '.......z........',
+  '......zzz.......',
+  '.......z........',
+];
+
+// 転職ティアごとの見た目バリエーション(パレット差し替え + 装飾)
+interface TierVariant {
+  base: string;
+  key: string;
+  palette: Palette;
+  under?: Layer;
+  over?: Layer;
+}
+
+const TIER_VARIANTS: TierVariant[] = [
+  // 剣士 → クルセイダー: 鋼の鎧 + 赤マント
+  {
+    base: 'warrior',
+    key: 'warrior2',
+    palette: {
+      r: '#7a96c4', R: '#4a628f', e: '#3a6ae8', b: '#3a4258', B: '#272e40',
+      X: '#cfe6ff', x: '#8fb0d8',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#c23a48' } },
+  },
+  // クルセイダー → ヒーロー: 黄金の鎧 + 緋色マント + 王冠
+  {
+    base: 'warrior',
+    key: 'warrior3',
+    palette: {
+      r: '#f2c14e', R: '#c2902a', e: '#d23c3c', b: '#5a3a6b', B: '#3d2749',
+      X: '#fff2c8', x: '#e8c060', g: '#ffe9b0',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#a32433' } },
+    over: { rows: CROWN_ROWS, palette: { g: '#ffd24a' } },
+  },
+  // 魔法使い → ウィザード: 紫ローブ + 星付き帽子
+  {
+    base: 'mage',
+    key: 'mage2',
+    palette: {
+      t: '#7a3ac4', T: '#54288f', r: '#8a4ad8', R: '#5f329f', u: '#c8a4ff',
+      j: '#4ae8c4', J: '#c8fff0',
+    },
+    over: { rows: STAR_ROWS, palette: { z: '#ffd24a' } },
+  },
+  // ウィザード → アークメイジ: 白金ローブ + マント + 王冠
+  {
+    base: 'mage',
+    key: 'mage3',
+    palette: {
+      t: '#f4f0ff', T: '#cfc4ea', w: '#ffd24a', r: '#e8e2f8', R: '#b8aed8',
+      u: '#f2c14e', j: '#ff4a8a', J: '#ffd0e0',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#6a3ac4' } },
+    over: { rows: CROWN_ROWS, palette: { g: '#ffd24a' } },
+  },
+];
 
 export function frameKeys(name: string): string[] {
   return SPRITES[name].frames.map((_, i) => `${name}_${i}`);
@@ -1166,6 +1275,18 @@ export function frameKeys(name: string): string[] {
 export function createAllTextures(scene: Phaser.Scene) {
   for (const [name, def] of Object.entries(SPRITES)) {
     def.frames.forEach((rows, i) => drawGrid(scene, `${name}_${i}`, rows, def.palette));
+  }
+  // 転職ティアの見た目(ベースのドット絵にパレット差し替え+装飾レイヤーを合成)
+  for (const v of TIER_VARIANTS) {
+    const base = SPRITES[v.base];
+    const palette = { ...base.palette, ...v.palette };
+    base.frames.forEach((rows, i) => {
+      const layers: Layer[] = [];
+      if (v.under) layers.push(v.under);
+      layers.push({ rows, palette });
+      if (v.over) layers.push(v.over);
+      drawLayers(scene, `${v.key}_${i}`, layers);
+    });
   }
   // 1x1 白ピクセル(バー・パーティクル用)
   const px = scene.textures.createCanvas('px', 2, 2)!;
@@ -1194,7 +1315,7 @@ export function createAllAnims(scene: Phaser.Scene) {
       repeat,
     });
   };
-  for (const who of ['warrior', 'mage']) {
+  for (const who of ['warrior', 'warrior2', 'warrior3', 'mage', 'mage2', 'mage3']) {
     mk(`${who}_stand`, who, [0], 1);
     mk(`${who}_walk`, who, [1, 0, 2, 0], 10);
     mk(`${who}_attack`, who, [3], 1, 0);

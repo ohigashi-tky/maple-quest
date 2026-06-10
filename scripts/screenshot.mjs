@@ -19,28 +19,38 @@ await page.goto(URL, { waitUntil: 'networkidle0' });
 await new Promise((r) => setTimeout(r, 2500));
 await page.screenshot({ path: '/tmp/maple-1-title.png' });
 
-// タイトルの「はじめから」をタップ (中央, VIEW基準 y=540/960 → 画面比率で計算)
-// キャンバスはletterboxされるので実際の描画域を求める
-const rect = await page.evaluate(() => {
+// キャンバスの論理解像度(高さは端末比率で動的)と表示位置を取得
+const info = await page.evaluate(() => {
   const c = document.querySelector('canvas');
   const r = c.getBoundingClientRect();
-  return { x: r.x, y: r.y, w: r.width, h: r.height };
+  return {
+    rect: { x: r.x, y: r.y, w: r.width, h: r.height },
+    vw: c.width, vh: c.height,
+    win: { w: window.innerWidth, h: window.innerHeight },
+  };
 });
-const toScreen = (vx, vy) => ({ x: rect.x + (vx / 540) * rect.w, y: rect.y + (vy / 960) * rect.h });
+console.log('canvas:', JSON.stringify(info));
+const fills =
+  Math.abs(info.rect.w - info.win.w) < 2 && Math.abs(info.rect.h - info.win.h) < 2;
+console.log(fills ? 'FULLSCREEN OK (canvas fills viewport)' : 'WARNING: canvas does not fill viewport');
 
-const start = toScreen(270, 960 - 420);
+const { rect, vw, vh } = info;
+const toScreen = (vx, vy) => ({ x: rect.x + (vx / vw) * rect.w, y: rect.y + (vy / vh) * rect.h });
+
+// タイトルの「はじめから」(VIEW_H-420)
+const start = toScreen(270, vh - 420);
 await page.touchscreen.tap(start.x, start.y);
 await new Promise((r) => setTimeout(r, 2000));
 await page.screenshot({ path: '/tmp/maple-2-game.png' });
 
 // 右移動を少し
-const right = toScreen(174, 858);
+const right = toScreen(174, vh - 102);
 await page.touchscreen.touchStart(right.x, right.y);
 await new Promise((r) => setTimeout(r, 1200));
 await page.touchscreen.touchEnd();
 
 // 攻撃ボタン連打
-const atk = toScreen(458, 862);
+const atk = toScreen(458, vh - 98);
 for (let i = 0; i < 5; i++) {
   await page.touchscreen.tap(atk.x, atk.y);
   await new Promise((r) => setTimeout(r, 350));
@@ -48,13 +58,13 @@ for (let i = 0; i < 5; i++) {
 await page.screenshot({ path: '/tmp/maple-3-attack.png' });
 
 // スキル1
-const sk = toScreen(338, 902);
+const sk = toScreen(338, vh - 58);
 await page.touchscreen.tap(sk.x, sk.y);
 await new Promise((r) => setTimeout(r, 500));
 await page.screenshot({ path: '/tmp/maple-4-skill.png' });
 
 // キャラ交代 → 魔法攻撃
-const sw = toScreen(330, 62);
+const sw = toScreen(48, 152);
 await page.touchscreen.tap(sw.x, sw.y);
 await new Promise((r) => setTimeout(r, 600));
 await page.touchscreen.tap(atk.x, atk.y);

@@ -5,7 +5,16 @@ import GameScene from './scenes/Game';
 import HudScene from './scenes/Hud';
 
 export const VIEW_W = 540;
-export const VIEW_H = 960;
+
+// 端末の画面比率に合わせて論理解像度の高さを決める(スマホで黒帯を出さないため)。
+// 横長(PC)では 960 に収めて左右レターボックスにする。
+function computeViewH(): number {
+  const aspect = window.innerHeight / Math.max(1, window.innerWidth);
+  const h = Math.round((VIEW_W * aspect) / 2) * 2;
+  return Math.max(960, Math.min(1200, h));
+}
+
+export const VIEW_H = computeViewH();
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,

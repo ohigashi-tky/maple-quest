@@ -4,12 +4,34 @@
 
 export type CharKey = 'warrior' | 'mage';
 
+// スキルは「種類 + パラメータ」で定義し、転職で強化版に差し替わる
+export type SkillKind = 'melee' | 'aoe' | 'rush' | 'projectile' | 'thunder' | 'heal';
+
 export interface SkillDef {
   id: string;
   name: string;
+  label: string; // ボタン表示(短)
   mp: number;
   cd: number; // ms
-  label: string; // ボタン表示(短)
+  kind: SkillKind;
+  mult: number; // 攻撃倍率(healでは未使用)
+  hits?: number; // melee/aoe: ヒット数
+  range?: number; // melee: 前方リーチ / thunder: 索敵範囲
+  radius?: number; // aoe: 半径
+  targets?: number; // thunder: 最大対象数
+  speed?: number; // projectile: 弾速
+  pierce?: boolean; // projectile: 貫通
+  healPct?: number; // heal: 最大HPに対する回復割合
+}
+
+// 転職ティア: 到達レベルでジョブ名・見た目・スキルが変わる
+export interface JobTier {
+  minLevel: number;
+  jobName: string;
+  rankName: string; // 「1次」「2次」「3次」
+  spriteKey: string; // テクスチャ/アニメのプレフィックス
+  atkBonus: number; // 攻撃力倍率
+  skills: SkillDef[];
 }
 
 export interface CharDef {
@@ -20,8 +42,10 @@ export interface CharDef {
   atk: number;
   speed: number;
   jump: number;
-  skills: SkillDef[];
+  tiers: JobTier[];
 }
+
+export const JOB_LEVELS = [1, 5, 10]; // 1次 / 2次 / 3次転職レベル
 
 export const CHARACTERS: Record<CharKey, CharDef> = {
   warrior: {
@@ -32,10 +56,31 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
     atk: 20,
     speed: 120,
     jump: 330,
-    skills: [
-      { id: 'power', name: 'パワーストライク', mp: 8, cd: 1200, label: '強撃' },
-      { id: 'blast', name: 'スラッシュブラスト', mp: 16, cd: 4000, label: '乱舞' },
-      { id: 'rush', name: 'ラッシュ', mp: 12, cd: 6000, label: '突進' },
+    tiers: [
+      {
+        minLevel: JOB_LEVELS[0], jobName: '剣士', rankName: '1次', spriteKey: 'warrior', atkBonus: 1,
+        skills: [
+          { id: 'power1', name: 'パワーストライク', label: '強撃', mp: 8, cd: 1200, kind: 'melee', mult: 1.7, hits: 2, range: 36 },
+          { id: 'blast1', name: 'スラッシュブラスト', label: '乱舞', mp: 16, cd: 4000, kind: 'aoe', mult: 2.2, hits: 1, radius: 64 },
+          { id: 'rush1', name: 'ラッシュ', label: '突進', mp: 12, cd: 6000, kind: 'rush', mult: 1.8 },
+        ],
+      },
+      {
+        minLevel: JOB_LEVELS[1], jobName: 'クルセイダー', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.25,
+        skills: [
+          { id: 'power2', name: 'コンボアタック', label: '連斬', mp: 10, cd: 1100, kind: 'melee', mult: 2.0, hits: 3, range: 40 },
+          { id: 'blast2', name: 'パニックブロウ', label: '大乱舞', mp: 20, cd: 3600, kind: 'aoe', mult: 2.6, hits: 2, radius: 80 },
+          { id: 'rush2', name: 'シールドラッシュ', label: '突進改', mp: 14, cd: 5000, kind: 'rush', mult: 2.4 },
+        ],
+      },
+      {
+        minLevel: JOB_LEVELS[2], jobName: 'ヒーロー', rankName: '3次', spriteKey: 'warrior3', atkBonus: 1.5,
+        skills: [
+          { id: 'power3', name: 'ブランディッシュ', label: '極撃', mp: 12, cd: 1000, kind: 'melee', mult: 2.5, hits: 4, range: 46 },
+          { id: 'blast3', name: 'インパクトウェーブ', label: '極乱舞', mp: 26, cd: 3200, kind: 'aoe', mult: 3.2, hits: 2, radius: 100 },
+          { id: 'rush3', name: 'ヒーローラッシュ', label: '極突進', mp: 18, cd: 4200, kind: 'rush', mult: 3.0 },
+        ],
+      },
     ],
   },
   mage: {
@@ -46,13 +91,47 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
     atk: 16,
     speed: 115,
     jump: 320,
-    skills: [
-      { id: 'fire', name: 'ファイアアロー', mp: 10, cd: 1500, label: '火矢' },
-      { id: 'thunder', name: 'サンダーボルト', mp: 24, cd: 5000, label: '雷撃' },
-      { id: 'heal', name: 'ヒール', mp: 20, cd: 8000, label: '回復' },
+    tiers: [
+      {
+        minLevel: JOB_LEVELS[0], jobName: '魔法使い', rankName: '1次', spriteKey: 'mage', atkBonus: 1,
+        skills: [
+          { id: 'fire1', name: 'ファイアアロー', label: '火矢', mp: 10, cd: 1500, kind: 'projectile', mult: 2.0, speed: 240, pierce: true },
+          { id: 'thunder1', name: 'サンダーボルト', label: '雷撃', mp: 24, cd: 5000, kind: 'thunder', mult: 2.4, targets: 4, range: 110 },
+          { id: 'heal1', name: 'ヒール', label: '回復', mp: 20, cd: 8000, kind: 'heal', mult: 0, healPct: 0.4 },
+        ],
+      },
+      {
+        minLevel: JOB_LEVELS[1], jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.25,
+        skills: [
+          { id: 'fire2', name: 'エクスプロージョン', label: '爆炎', mp: 14, cd: 1300, kind: 'projectile', mult: 2.6, speed: 280, pierce: true },
+          { id: 'thunder2', name: 'サンダースピア', label: '雷槍', mp: 30, cd: 4400, kind: 'thunder', mult: 2.8, targets: 6, range: 130 },
+          { id: 'heal2', name: 'ヒーリング', label: '回復改', mp: 26, cd: 7000, kind: 'heal', mult: 0, healPct: 0.6 },
+        ],
+      },
+      {
+        minLevel: JOB_LEVELS[2], jobName: 'アークメイジ', rankName: '3次', spriteKey: 'mage3', atkBonus: 1.5,
+        skills: [
+          { id: 'fire3', name: 'メテオ', label: '隕石', mp: 18, cd: 1200, kind: 'projectile', mult: 3.4, speed: 300, pierce: true },
+          { id: 'thunder3', name: 'チェーンライトニング', label: '連雷', mp: 38, cd: 3800, kind: 'thunder', mult: 3.4, targets: 8, range: 150 },
+          { id: 'heal3', name: 'ジェネシス', label: '大回復', mp: 34, cd: 6000, kind: 'heal', mult: 0, healPct: 0.85 },
+        ],
+      },
     ],
   },
 };
+
+// 現在レベルで適用されるジョブティアを返す
+export function tierIndexFor(def: CharDef, level: number): number {
+  let idx = 0;
+  def.tiers.forEach((t, i) => {
+    if (level >= t.minLevel) idx = i;
+  });
+  return idx;
+}
+
+export function tierFor(def: CharDef, level: number): JobTier {
+  return def.tiers[tierIndexFor(def, level)];
+}
 
 export interface EnemyDef {
   key: string;

@@ -18,12 +18,14 @@ page.on('console', (msg) => {
 await page.goto(URL, { waitUntil: 'networkidle0' });
 await new Promise((r) => setTimeout(r, 2000));
 
-const rect = await page.evaluate(() => {
-  const r = document.querySelector('canvas').getBoundingClientRect();
-  return { x: r.x, y: r.y, w: r.width, h: r.height };
+const info = await page.evaluate(() => {
+  const c = document.querySelector('canvas');
+  const r = c.getBoundingClientRect();
+  return { rect: { x: r.x, y: r.y, w: r.width, h: r.height }, vw: c.width, vh: c.height };
 });
-const toScreen = (vx, vy) => ({ x: rect.x + (vx / 540) * rect.w, y: rect.y + (vy / 960) * rect.h });
-const start = toScreen(270, 960 - 420);
+const { rect, vw, vh } = info;
+const toScreen = (vx, vy) => ({ x: rect.x + (vx / vw) * rect.w, y: rect.y + (vy / vh) * rect.h });
+const start = toScreen(270, vh - 420);
 await page.touchscreen.tap(start.x, start.y);
 await new Promise((r) => setTimeout(r, 1500));
 
