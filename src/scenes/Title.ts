@@ -76,33 +76,17 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '18px', color: '#cfe0ff',
     }).setOrigin(0.5).setResolution(2);
 
-    // ジョブ選択トグル(戦士が既定)
-    this.add.text(cx, VIEW_H - 488, 'ジョブ', {
-      fontFamily: 'sans-serif', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', stroke: '#4a2a5a', strokeThickness: 4,
-    }).setOrigin(0.5).setResolution(2);
-    this.classBtns = [];
-    const onClass = (k: CharKey) => {
-      this.selectedClass = k;
-      lvText.setText(`Lv.${save.level}  ${tierFor(CHARACTERS[k], save.level).jobName}`);
-      this.classBtns.forEach((b) => b.redraw());
-    };
-    this.makeClassToggle(cx - 96, VIEW_H - 440, 'warrior', '戦士', 'ダークナイト系', 0xc85a3a, onClass);
-    this.makeClassToggle(cx + 96, VIEW_H - 440, 'mage', '魔法使い', 'アークメイジ系', 0x3a6ad8, onClass);
-
-    // 挑戦(1階 EASY から)
-    this.makeButton(cx, VIEW_H - 350, '挑 戦', '第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
+    // 戦士で挑戦(1階 EASY から)。ゲーム内で魔法使いに交代可能
+    this.selectedClass = 'warrior';
+    this.makeButton(cx, VIEW_H - 380, '挑 戦', '戦士で第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
     // 階層をえらぶ(難易度・到達階層から)
-    this.makeButton(cx, VIEW_H - 262, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
+    this.makeButton(cx, VIEW_H - 292, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
       initAudio();
       openFloorSelect(this, loadSave(), 0, (f, d) => this.start(f, d));
     });
 
-    // Lv1からやり直す(確認あり・小さめ)
-    this.makeSmallButton(cx, VIEW_H - 196, 'Lv1からやり直す', 0x9a3a4a, () => this.confirmReset());
-
-    this.add.text(cx, VIEW_H - 14, 'レベルは記憶され(最大Lv999)、自分の強さで何階まで登れるか挑戦!', {
-      fontFamily: 'sans-serif', fontSize: '14px', color: '#5a4a3a',
-    }).setOrigin(0.5, 1);
+    // Lv1からやり直す(確認あり・小さめ。誤タップ防止に十分な余白を上に)
+    this.makeSmallButton(cx, VIEW_H - 150, 'Lv1からやり直す', 0x9a3a4a, () => this.confirmReset());
 
     // 音量切り替えアイコン(右上・セーフエリア考慮)
     this.buildSoundToggle();

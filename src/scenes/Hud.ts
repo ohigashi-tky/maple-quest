@@ -47,6 +47,7 @@ export default class HudScene extends Phaser.Scene {
 
   private banner?: Phaser.GameObjects.Container;
   private overlay?: Phaser.GameObjects.Container;
+  private gamePaused = false;
   private mpFlashUntil = 0;
 
   constructor() {
@@ -247,9 +248,24 @@ export default class HudScene extends Phaser.Scene {
     }, () => this.confirmHome());
   }
 
+  // Gameシーンを一時停止(ボスの攻撃・移動・ダメージ・タイマーをすべて止める)
+  private pauseGame() {
+    if (this.scene.isActive('Game') && !this.scene.isPaused('Game')) {
+      this.scene.pause('Game');
+      this.gamePaused = true;
+    }
+  }
+  private resumeGame() {
+    if (this.gamePaused) {
+      this.scene.resume('Game');
+      this.gamePaused = false;
+    }
+  }
+
   // 一時停止画面
   private showPause() {
     if (this.overlay) return;
+    this.pauseGame();
     sfx('select');
     const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(120);
@@ -261,7 +277,7 @@ export default class HudScene extends Phaser.Scene {
     c.add(this.makeOverlayButton(VIEW_W / 2, cy - 30, 'ゲームにもどる', 0x4aa84a, () => this.clearOverlay()));
     c.add(this.makeOverlayButton(VIEW_W / 2, cy + 58, isMuted() ? '🔇 音量オン' : '🔊 音量オフ', 0x3a6ad8, () => {
       setMuted(!isMuted());
-      this.clearOverlay();
+      this.overlay?.destroy(); this.overlay = undefined;
       this.showPause();
     }));
     c.add(this.makeOverlayButton(VIEW_W / 2, cy + 146, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
@@ -270,6 +286,7 @@ export default class HudScene extends Phaser.Scene {
 
   private confirmHome() {
     if (this.overlay) return;
+    this.pauseGame();
     sfx('select');
     const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(120);
@@ -562,10 +579,13 @@ export default class HudScene extends Phaser.Scene {
   private clearOverlay() {
     this.overlay?.destroy();
     this.overlay = undefined;
+    this.resumeGame();
   }
 
   private toTitle() {
-    this.clearOverlay();
+    this.overlay?.destroy();
+    this.overlay = undefined;
+    this.gamePaused = false;
     stopBgm();
     this.registry.remove('progress');
     this.scene.stop('Game');

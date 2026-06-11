@@ -60,6 +60,9 @@ interface BossSprite extends Phaser.Physics.Arcade.Sprite {
   stunUntil?: number;
   dmgStackAt?: number;  // 直近のダメージ表示時刻(多段の積み重ね用)
   dmgStackN?: number;   // 連続ヒット数
+  roamAt?: number;      // 次に気まぐれ移動を更新する時刻
+  targetDist?: number;  // 現在保とうとしている間合い
+  strafe?: number;      // 横方向の気まぐれ(-1/0/1)
 }
 
 export default class GameScene extends Phaser.Scene {
@@ -1507,32 +1510,41 @@ export default class GameScene extends Phaser.Scene {
     const enraged = b.hp < b.maxhp * 0.5;
     // ダッシュ攻撃などで速度が高い間はAIの移動を上書きしない
     const dashing = Math.abs(body.velocity.x) > 180 || Math.abs(body.velocity.y) > 200;
-    const spd = (b.floor.archetype === 'beast' ? 78 : 50) * (enraged ? 1.4 : 1);
-    // アーキタイプごとの「保ちたい間合い」(近接ボスは近め、遠隔ボスは遠め)
-    const keep = ({ golem: 46, mush: 50, beast: 40, knight: 44, drake: 96, demon: 100, clown: 104, witch: 120, lord: 124 } as Record<string, number>)[b.floor.archetype] ?? 70;
+    const spd = (b.floor.archetype === 'beast' ? 78 : 52) * (enraged ? 1.4 : 1);
+    // アーキタイプごとの基準間合い(近接ボスは近め、遠隔ボスは遠め)
+    const keep = ({ golem: 46, mush: 50, beast: 40, knight: 44, drake: 96, demon: 100, clown: 104, witch: 118, lord: 122 } as Record<string, number>)[b.floor.archetype] ?? 70;
     const dx = this.player.x - b.x;
     const adx = Math.abs(dx);
     const face = Math.sign(dx) || b.dir || 1;
     b.dir = face;
     b.setFlipX(face < 0);
 
+    // 気まぐれ更新: 一定間隔で保ちたい間合い・横移動の向きをランダムに変える(壁際で固まらない)
+    if (!b.roamAt || now > b.roamAt) {
+      b.roamAt = now + Phaser.Math.Between(650, 1500);
+      b.targetDist = keep * Phaser.Math.FloatBetween(0.5, 1.4);
+      b.strafe = Phaser.Math.Between(-1, 1);
+    }
+    const td = b.targetDist ?? keep;
+    const drift = (b.strafe ?? 0) * spd * 0.55;          // 横方向の気まぐれ
+    const wobble = Math.sin(now / 380 + b.x * 0.05) * spd * 0.3; // 常に少し揺れる
+
     if (b.flying) {
       const dy = (this.player.y - 16) - b.y;
-      let vx = 0;
-      if (adx > keep + 18) vx = face * spd;          // 遠い→寄る
-      else if (adx < keep - 18) vx = -face * spd * 0.8; // 近すぎ→離れる
-      else vx = Math.sin(now / 500 + b.x) * spd * 0.4;  // 間合い維持で漂う
-      // 画面端で押し戻し
-      if (b.x < 30) vx = Math.abs(vx) + 20;
-      if (b.x > ARENA_W - 30) vx = -Math.abs(vx) - 20;
+      let vx: number;
+      if (adx > td + 12) vx = face * spd + drift * 0.3;   // 遠い→寄る(ヘイト)
+      else if (adx < td - 12) vx = -face * spd * 0.85;     // 近すぎ→離れる
+      else vx = drift + wobble;                            // 間合い内でも漂って止まらない
+      if (b.x < 44) vx = spd;                              // 壁際は中央へ
+      if (b.x > ARENA_W - 44) vx = -spd;
       body.setVelocity(vx, Phaser.Math.Clamp(dy, -1, 1) * spd * 0.5 + Math.sin(now / 320 + b.x) * 12);
     } else if (!dashing) {
-      let vx = 0;
-      if (adx > keep + 16) vx = face * spd;
-      else if (adx < keep - 16) vx = -face * spd * 0.9;  // 近すぎたら下がる(まとわりつき防止)
-      else vx = 0;                                        // 間合い内は止まって攻撃
-      if (b.x < 26) vx = spd;
-      if (b.x > ARENA_W - 26) vx = -spd;
+      let vx: number;
+      if (adx > td + 12) vx = face * spd + drift * 0.3;
+      else if (adx < td - 12) vx = -face * spd * 0.85;     // 近すぎたら下がる(まとわりつき防止)
+      else vx = drift + wobble;                            // 間合い内でもふらつく(固まらない)
+      if (b.x < 40) vx = spd;                              // 壁際は中央へ押し戻し
+      if (b.x > ARENA_W - 40) vx = -spd;
       body.setVelocityX(vx);
     }
     this.drawBossHpBar(b, now);

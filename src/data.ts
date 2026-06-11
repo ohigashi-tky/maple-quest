@@ -80,41 +80,41 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 1, jobName: '剣士', rankName: '1次', spriteKey: 'warrior', atkBonus: 1,
         skills: [
-          { id: 'w1a', name: 'パワーストライク', mp: 6, cd: 700, kind: 'melee', mult: 1.6, hits: 2, range: 40 },
-          { id: 'w1b', name: 'スラッシュブラスト', mp: 10, cd: 1400, kind: 'aoe', mult: 1.2, hits: 2, radius: 66 },
-          { id: 'w1c', name: 'アイアンボディ', mp: 12, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
+          { id: 'w1a', name: 'パワーストライク', mp: 4, cd: 700, kind: 'melee', mult: 1.6, hits: 2, range: 40 },
+          { id: 'w1b', name: 'スラッシュブラスト', mp: 6, cd: 1400, kind: 'aoe', mult: 1.2, hits: 2, radius: 66 },
+          { id: 'w1c', name: 'アイアンボディ', mp: 7, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
         ],
       },
       {
         minLevel: 10, jobName: 'スピアマン', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.25,
         skills: [
-          { id: 'w2a', name: 'スピアクラッシュ', mp: 7, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
-          { id: 'w2b', name: 'ファイナルアタック', mp: 12, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
-          { id: 'w2c', name: 'ハイパーボディ', mp: 16, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.3, defCut: 0.6 },
+          { id: 'w2a', name: 'スピアクラッシュ', mp: 4, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
+          { id: 'w2b', name: 'ファイナルアタック', mp: 7, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
+          { id: 'w2c', name: 'ハイパーボディ', mp: 10, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.3, defCut: 0.6 },
         ],
       },
       {
         minLevel: 30, jobName: 'ドラゴンナイト', rankName: '3次', spriteKey: 'warrior3', atkBonus: 1.55,
         skills: [
-          { id: 'w3a', name: 'ドラゴンバスター', mp: 8, cd: 800, kind: 'melee', mult: 1.7, hits: 4, range: 56 },
-          { id: 'w3b', name: 'ドラゴンフューリー', mp: 14, cd: 1700, kind: 'aoe', mult: 1.5, hits: 4, radius: 90 },
-          { id: 'w3c', name: 'ドラゴンブラッド', mp: 18, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
+          { id: 'w3a', name: 'ドラゴンバスター', mp: 5, cd: 800, kind: 'melee', mult: 1.7, hits: 4, range: 56 },
+          { id: 'w3b', name: 'ドラゴンフューリー', mp: 8, cd: 1700, kind: 'aoe', mult: 1.5, hits: 4, radius: 90 },
+          { id: 'w3c', name: 'ドラゴンブラッド', mp: 11, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
         ],
       },
       {
         minLevel: 60, jobName: 'ダークナイト', rankName: '4次', spriteKey: 'warrior4', atkBonus: 2.0,
         skills: [
-          { id: 'w4a', name: 'サウザンドスピア', mp: 10, cd: 850, kind: 'melee', mult: 1.6, hits: 6, range: 62 },
-          { id: 'w4b', name: 'ガングニールの降臨', mp: 18, cd: 2000, kind: 'aoe', mult: 1.8, hits: 5, radius: 110 },
-          { id: 'w4c', name: 'ビホルダー', mp: 22, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.5 },
+          { id: 'w4a', name: 'サウザンドスピア', mp: 6, cd: 850, kind: 'melee', mult: 1.6, hits: 6, range: 62 },
+          { id: 'w4b', name: 'ガングニールの降臨', mp: 11, cd: 2000, kind: 'aoe', mult: 1.8, hits: 5, radius: 110 },
+          { id: 'w4c', name: 'ビホルダー', mp: 13, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.5 },
         ],
       },
       {
         minLevel: 100, jobName: 'ダークナイト・極', rankName: '5次', spriteKey: 'warrior5', atkBonus: 2.6,
         skills: [
-          { id: 'w5a', name: 'ダークインペール', mp: 12, cd: 800, kind: 'melee', mult: 1.9, hits: 8, range: 70 },
-          { id: 'w5b', name: 'ガングニールの咆哮', mp: 22, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
-          { id: 'w5c', name: 'リインカーネーション', mp: 28, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 13000, atkBuff: 1.8, defCut: 0.5 },
+          { id: 'w5a', name: 'ダークインペール', mp: 7, cd: 800, kind: 'melee', mult: 1.9, hits: 8, range: 70 },
+          { id: 'w5b', name: 'ガングニールの咆哮', mp: 13, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
+          { id: 'w5c', name: 'リインカーネーション', mp: 17, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 13000, atkBuff: 1.8, defCut: 0.5 },
         ],
       },
     ],
@@ -312,16 +312,17 @@ export interface DifficultyDef {
   flat: number;    // 推奨レベルの下限(段階間で確実に強くする)
   slope: number;   // 階層ごとの推奨レベルの伸び
   expMul: number;  // 経験値ボーナス
+  hpMul: number;   // ボスHP補正(EASYは少し低め)
   color: number;
   desc: string;
 }
 // 実効推奨Lv = flat + baseReq(floor) * slope
 // 前段階の最終階(=次段階の1階の手強さ)が次段階1階で「格段に強い」ようflatを設定
 export const DIFFICULTIES: DifficultyDef[] = [
-  { key: 'easy',   name: 'EASY',   flat: 0,   slope: 1.0, expMul: 1.0,  color: 0x4aa84a, desc: 'まずはここから (1階〜)' },
-  { key: 'normal', name: 'NORMAL', flat: 28,  slope: 1.6, expMul: 1.6,  color: 0x3a7fd6, desc: '1階から手強い (推奨Lv30〜)' },
-  { key: 'hard',   name: 'HARD',   flat: 72,  slope: 2.6, expMul: 2.4,  color: 0xd8730f, desc: '歴戦の挑戦者へ (推奨Lv75〜)' },
-  { key: 'oni',    name: '鬼モード', flat: 150, slope: 4.0, expMul: 3.8, color: 0xc02a3a, desc: 'Lv150以上で挑め (推奨Lv154〜)' },
+  { key: 'easy',   name: 'EASY',   flat: 0,   slope: 1.0, expMul: 1.0,  hpMul: 0.78, color: 0x4aa84a, desc: 'まずはここから (1階〜)' },
+  { key: 'normal', name: 'NORMAL', flat: 28,  slope: 1.6, expMul: 1.6,  hpMul: 1.0,  color: 0x3a7fd6, desc: '1階から手強い (推奨Lv30〜)' },
+  { key: 'hard',   name: 'HARD',   flat: 72,  slope: 2.6, expMul: 2.4,  hpMul: 1.0,  color: 0xd8730f, desc: '歴戦の挑戦者へ (推奨Lv75〜)' },
+  { key: 'oni',    name: '鬼モード', flat: 150, slope: 4.0, expMul: 3.8, hpMul: 1.0,  color: 0xc02a3a, desc: 'Lv150以上で挑め (推奨Lv154〜)' },
 ];
 
 // 階層×難易度の実効推奨レベル(敵の強さの基準)
@@ -332,7 +333,7 @@ export function effReq(f: FloorDef, diff: number): number {
 
 // ボスのステータス(実効推奨レベルから算出)
 export function bossHp(f: FloorDef, diff: number): number {
-  return Math.round(refAtk(effReq(f, diff)) * (f.major ? 55 : 32));
+  return Math.round(refAtk(effReq(f, diff)) * (f.major ? 55 : 32) * DIFFICULTIES[diff].hpMul);
 }
 export function bossAtk(f: FloorDef, diff: number): number {
   return Math.round(refHp(effReq(f, diff)) * (f.major ? 0.11 : 0.08));
