@@ -1547,6 +1547,7 @@ export default class GameScene extends Phaser.Scene {
     this.updateBoss();
     this.updateShots();
     this.updatePickups();
+    if (!this.infinite) this.updatePortal();
     this.syncUiState();
   }
 
