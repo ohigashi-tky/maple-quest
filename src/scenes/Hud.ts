@@ -11,6 +11,8 @@ interface BtnOpts {
   sub?: string;
   icon?: string;
   iconScale?: number;
+  wrap?: boolean;      // ラベルを小さく折り返す(技名用)
+  labelY?: number;
 }
 
 interface Btn {
@@ -54,7 +56,7 @@ export default class HudScene extends Phaser.Scene {
     this.game_ = this.scene.get('Game') as GameScene;
     this.buildStatusBars();
     this.buildBossBar();
-    this.buildDpad();
+    this.buildJoystick();
     this.buildActionButtons();
     this.buildTopRight();
     this.scene.bringToTop();
@@ -173,20 +175,22 @@ export default class HudScene extends Phaser.Scene {
   // ============================================================
   private buildTopRight() {
     const g = this.add.graphics();
-    g.fillStyle(0x1a1430, 0.75);
-    g.fillRoundedRect(VIEW_W - 226, 14, 212, 62, 12);
+    g.fillStyle(0x1a1430, 0.78);
+    g.fillRoundedRect(VIEW_W - 232, 14, 218, 70, 12);
     g.lineStyle(2, 0x8a7ac4, 0.8);
-    g.strokeRoundedRect(VIEW_W - 226, 14, 212, 62, 12);
+    g.strokeRoundedRect(VIEW_W - 232, 14, 218, 70, 12);
 
-    this.stageText = this.add.text(VIEW_W - 120, 32, '', {
-      fontFamily: 'sans-serif', fontSize: '14px', fontStyle: 'bold', color: '#dcd2ff',
+    // 階層(大)
+    this.stageText = this.add.text(VIEW_W - 123, 30, '', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '17px', fontStyle: 'bold', color: '#ffe9b0',
     }).setOrigin(0.5).setResolution(2);
-    this.killText = this.add.text(VIEW_W - 120, 56, '', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9b0',
+    // ボス名 + 推奨レベル
+    this.killText = this.add.text(VIEW_W - 123, 58, '', {
+      fontFamily: 'sans-serif', fontSize: '13px', color: '#dcd2ff', align: 'center',
     }).setOrigin(0.5).setResolution(2);
 
     // ミュートボタン
-    const mute = this.add.text(VIEW_W - 30, 100, '🔊', { fontSize: '24px' }).setOrigin(0.5);
+    const mute = this.add.text(VIEW_W - 28, 106, '🔊', { fontSize: '24px' }).setOrigin(0.5);
     mute.setInteractive({ useHandCursor: true });
     mute.on('pointerdown', () => {
       setMuted(!isMuted());
@@ -195,59 +199,66 @@ export default class HudScene extends Phaser.Scene {
   }
 
   // ============================================================
-  // 移動ボタン(左下)— 下方向なし: 左・右・上(垂直J)・左上/右上(斜めJ)
+  // ジョイスティック(左下)— 押した方向に白い丸。下方向なし(上=ジャンプ)
   // ============================================================
-  private buildDpad() {
-    // angle: 矢印の向き(度)。0=右, 180=左, -90=上, -135=左上, -45=右上
-    const mk = (x: number, y: number, r: number, angle: number, dirs: ('left' | 'right' | 'up')[]) => {
-      const c = this.add.container(x, y);
-      const g = this.add.graphics();
-      g.fillStyle(0x1a1430, 0.55);
-      g.fillCircle(0, 0, r);
-      g.lineStyle(3, 0xffffff, 0.35);
-      g.strokeCircle(0, 0, r);
-      // 矢印(angle方向を向く三角形)
-      g.fillStyle(0xffffff, 0.85);
-      const rad = (angle * Math.PI) / 180;
-      const tip = r * 0.42;
-      const back = r * 0.24;
-      const wide = r * 0.42;
-      const cos = Math.cos(rad), sin = Math.sin(rad);
-      const rot = (px: number, py: number): [number, number] => [px * cos - py * sin, px * sin + py * cos];
-      const [ax, ay] = rot(tip, 0);
-      const [bx, by] = rot(-back, -wide);
-      const [cx2, cy2] = rot(-back, wide);
-      g.fillTriangle(ax, ay, bx, by, cx2, cy2);
-      c.add(g);
-      c.setSize(r * 2 + 8, r * 2 + 8);
-      c.setInteractive();
-      const on = () => {
-        const patch: Record<string, boolean> = {};
-        for (const d of dirs) patch[d] = true;
-        this.game_.setPad(patch as never);
-        g.setAlpha(1.5);
-      };
-      const off = () => {
-        const patch: Record<string, boolean> = {};
-        for (const d of dirs) patch[d] = false;
-        this.game_.setPad(patch as never);
-        g.setAlpha(1);
-      };
-      c.on('pointerdown', on);
-      c.on('pointerover', (p: Phaser.Input.Pointer) => p.isDown && on());
-      c.on('pointerup', off);
-      c.on('pointerout', off);
-      c.on('pointerupoutside', off);
-      return c;
+  private joyCx = 120;
+  private joyCy = VIEW_H - 150;
+  private joyR = 78;          // 基部の半径
+  private joyKnob!: Phaser.GameObjects.Arc;
+  private joyPointerId: number | null = null;
+
+  private buildJoystick() {
+    const g = this.add.graphics();
+    // 基部の円
+    g.fillStyle(0x1a1430, 0.45);
+    g.fillCircle(this.joyCx, this.joyCy, this.joyR);
+    g.lineStyle(4, 0xffffff, 0.25);
+    g.strokeCircle(this.joyCx, this.joyCy, this.joyR);
+    // 方向ガイド(上/左/右の薄い印)
+    g.fillStyle(0xffffff, 0.18);
+    g.fillTriangle(this.joyCx, this.joyCy - this.joyR + 8, this.joyCx - 10, this.joyCy - this.joyR + 24, this.joyCx + 10, this.joyCy - this.joyR + 24);
+    g.fillTriangle(this.joyCx - this.joyR + 8, this.joyCy, this.joyCx - this.joyR + 24, this.joyCy - 10, this.joyCx - this.joyR + 24, this.joyCy + 10);
+    g.fillTriangle(this.joyCx + this.joyR - 8, this.joyCy, this.joyCx + this.joyR - 24, this.joyCy - 10, this.joyCx + this.joyR - 24, this.joyCy + 10);
+
+    // ノブ(押している方向に出る白い丸)
+    this.joyKnob = this.add.circle(this.joyCx, this.joyCy, 26, 0xffffff, 0.85).setVisible(false);
+
+    // 入力ゾーン(基部より少し広め)
+    const zone = this.add.zone(this.joyCx, this.joyCy, this.joyR * 2.4, this.joyR * 2.4).setInteractive();
+    zone.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      if (this.joyPointerId !== null) return;
+      this.joyPointerId = p.id;
+      this.updateJoy(p);
+    });
+
+    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
+      if (p.id === this.joyPointerId) this.updateJoy(p);
+    });
+    const release = (p: Phaser.Input.Pointer) => {
+      if (p.id === this.joyPointerId) this.resetJoy();
     };
-    const baseY = VIEW_H - 96;
-    // 下段: 左右移動
-    mk(58, baseY, 46, 180, ['left']);
-    mk(166, baseY, 46, 0, ['right']);
-    // 上段: 斜めジャンプ(左上/右上) と 垂直ジャンプ(上)
-    mk(48, baseY - 104, 38, -135, ['up', 'left']);
-    mk(112, baseY - 150, 40, -90, ['up']);
-    mk(176, baseY - 104, 38, -45, ['up', 'right']);
+    this.input.on('pointerup', release);
+    this.input.on('pointerupoutside', release);
+  }
+
+  private updateJoy(p: Phaser.Input.Pointer) {
+    let dx = p.x - this.joyCx;
+    let dy = p.y - this.joyCy;
+    const dist = Math.hypot(dx, dy);
+    const max = this.joyR;
+    if (dist > max) { dx = (dx / dist) * max; dy = (dy / dist) * max; }
+    this.joyKnob.setPosition(this.joyCx + dx, this.joyCy + dy).setVisible(true);
+    // 方向判定(下方向は無視)
+    const left = dx < -max * 0.28;
+    const right = dx > max * 0.28;
+    const up = dy < -max * 0.34;
+    this.game_.setPad({ left, right, up } as never);
+  }
+
+  private resetJoy() {
+    this.joyPointerId = null;
+    this.joyKnob.setVisible(false).setPosition(this.joyCx, this.joyCy);
+    this.game_.setPad({ left: false, right: false, up: false } as never);
   }
 
   // ============================================================
@@ -265,10 +276,19 @@ export default class HudScene extends Phaser.Scene {
       c.add(icon);
     }
     let label: Phaser.GameObjects.Text | undefined;
-    if (opts.label) {
-      label = this.add.text(0, opts.icon ? opts.r - 18 : -4, opts.label, {
-        fontFamily: 'sans-serif', fontSize: `${Math.max(13, opts.r * 0.36)}px`, fontStyle: 'bold', color: '#ffffff',
-      }).setOrigin(0.5).setResolution(2);
+    if (opts.label !== undefined) {
+      if (opts.wrap) {
+        // 技名: 小さめフォントで折り返してボタン内に収める
+        label = this.add.text(0, opts.labelY ?? -6, opts.label, {
+          fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#ffffff',
+          align: 'center', wordWrap: { width: opts.r * 1.9 }, lineSpacing: 1,
+          stroke: '#2a1f3d', strokeThickness: 2,
+        }).setOrigin(0.5).setResolution(3);
+      } else {
+        label = this.add.text(0, opts.icon ? opts.r - 18 : -4, opts.label, {
+          fontFamily: 'sans-serif', fontSize: `${Math.max(13, opts.r * 0.36)}px`, fontStyle: 'bold', color: '#ffffff',
+        }).setOrigin(0.5).setResolution(2);
+      }
       c.add(label);
     }
     let sub: Phaser.GameObjects.Text | undefined;
@@ -320,22 +340,22 @@ export default class HudScene extends Phaser.Scene {
   private buildActionButtons() {
     const game = () => this.game_;
 
-    // 攻撃(オレンジ・特大)連打対応 — ジャンプは移動キーの上方向に統合したため廃止
-    this.makeButton(462, VIEW_H - 96, { r: 58, color: 0xff8a2a, label: '攻撃' }, () => game().doAttack(), true);
+    // 攻撃(オレンジ・特大)連打対応 — ジャンプは移動スティックの上方向に統合
+    this.makeButton(468, VIEW_H - 92, { r: 54, color: 0xff8a2a, label: '攻撃' }, () => game().doAttack(), true);
 
-    // スキル3つ(攻撃ボタンの周りに扇状配置)
-    const skillPos: [number, number][] = [[330, VIEW_H - 76], [318, VIEW_H - 176], [378, VIEW_H - 262]];
+    // スキル3つ(実技名を折り返し表示・攻撃ボタンの周りに扇状配置)
+    const skillPos: [number, number][] = [[332, VIEW_H - 78], [322, VIEW_H - 188], [402, VIEW_H - 250]];
     this.skillBtns = skillPos.map(([x, y], i) =>
-      this.makeButton(x, y, { r: 38, color: 0x8a5ac4, label: '-', sub: '' }, () => game().doSkill(i))
+      this.makeButton(x, y, { r: 46, color: 0x8a5ac4, label: '', sub: '', wrap: true, labelY: -8 }, () => game().doSkill(i))
     );
 
     // エリクサー(HP/MP全回復・1種)
-    this.potionHpBtn = this.makeButton(250, VIEW_H - 232, { r: 34, color: 0xd8930f, icon: 'elixir_0', iconScale: 2.4, sub: '0' }, () => game().useElixir());
+    this.potionHpBtn = this.makeButton(232, VIEW_H - 246, { r: 34, color: 0xd8930f, icon: 'elixir_0', iconScale: 2.4, sub: '0' }, () => game().useElixir());
 
     // キャラ交代(ステータスパネルの下)
-    this.switchBtn = this.makeButton(48, 178, { r: 28, color: 0x4aa84a, label: '' }, () => game().switchChar());
-    this.switchIcon = this.add.sprite(48, 176, 'mage_0').setScale(1.7);
-    this.add.text(48, 202, '交代', {
+    this.switchBtn = this.makeButton(48, 200, { r: 28, color: 0x4aa84a, label: '' }, () => game().switchChar());
+    this.switchIcon = this.add.sprite(48, 198, 'mage_0').setScale(1.7);
+    this.add.text(48, 224, '交代', {
       fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', stroke: '#1a3d1a', strokeThickness: 3,
     }).setOrigin(0.5).setResolution(2);
   }
@@ -375,51 +395,53 @@ export default class HudScene extends Phaser.Scene {
     });
   }
 
-  showGameOver(onRevive: () => void) {
+  showGameOver(floor: number, onRetry: () => void) {
     this.clearOverlay();
     const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(100);
     const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x000000, 0.72).setInteractive();
-    const title = this.add.text(VIEW_W / 2, cy - 160, 'GAME OVER', {
+    const title = this.add.text(VIEW_W / 2, cy - 180, 'GAME OVER', {
       fontFamily: '"Arial Black", sans-serif', fontSize: '56px',
       color: '#ff5a5a', stroke: '#3d0a0a', strokeThickness: 10,
     }).setOrigin(0.5).setResolution(2);
-    const subtitle = this.add.text(VIEW_W / 2, cy - 94, '勇者たちは力尽きた…', {
-      fontFamily: 'sans-serif', fontSize: '22px', color: '#ffd8d8',
+    const subtitle = this.add.text(VIEW_W / 2, cy - 110, `第 ${floor} 階で力尽きた…`, {
+      fontFamily: 'sans-serif', fontSize: '24px', color: '#ffd8d8',
     }).setOrigin(0.5).setResolution(2);
-    c.add([dim, title, subtitle]);
-    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 20, 'このステージから復活', 0xff8a2a, () => {
+    const hint = this.add.text(VIEW_W / 2, cy - 60, 'レベルは引き継がれる。\n鍛えて再挑戦しよう!', {
+      fontFamily: 'sans-serif', fontSize: '18px', color: '#cfe0ff', align: 'center', lineSpacing: 6,
+    }).setOrigin(0.5).setResolution(2);
+    c.add([dim, title, subtitle, hint]);
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 30, '1階から再挑戦', 0xff8a2a, () => {
       this.clearOverlay();
-      onRevive();
+      onRetry();
     }));
-    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 120, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 130, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
     this.overlay = c;
   }
 
-  showClear(stats: { level: number; kills: number; time: number }) {
+  showClear(stats: { level: number; floor: number; time: number }) {
     this.clearOverlay();
     sfx('levelup');
     const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(100);
     const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x0a0a20, 0.82).setInteractive();
-    const title = this.add.text(VIEW_W / 2, cy - 210, 'GAME CLEAR!', {
-      fontFamily: '"Arial Black", sans-serif', fontSize: '54px',
+    const title = this.add.text(VIEW_W / 2, cy - 210, '全 20 階 制覇!', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '46px',
       color: '#ffd24a', stroke: '#7a4a21', strokeThickness: 10,
     }).setOrigin(0.5).setResolution(2);
-    const sub = this.add.text(VIEW_W / 2, cy - 144, '闇に堕ちた女帝を解放した!\nきのこ島に平和が戻った 🎉', {
+    const sub = this.add.text(VIEW_W / 2, cy - 150, '黒き魔導士を打ち倒し\n道場の頂に立った! 🎉', {
       fontFamily: 'sans-serif', fontSize: '22px', color: '#ffffff', align: 'center',
     }).setOrigin(0.5).setResolution(2);
     const m = Math.floor(stats.time / 60), s = stats.time % 60;
     const statsText = this.add.text(VIEW_W / 2, cy - 40,
-      `とうたつレベル: Lv.${stats.level}\nモンスター討伐数: ${stats.kills}体\nクリアタイム: ${m}分${s}秒`, {
+      `とうたつレベル: Lv.${stats.level}\n制覇タイム: ${m}分${s}秒`, {
         fontFamily: 'sans-serif', fontSize: '24px', color: '#cfe0ff', align: 'center', lineSpacing: 10,
       }).setOrigin(0.5).setResolution(2);
-    // 主役たちのドット絵
-    const w = this.add.sprite(VIEW_W / 2 - 60, cy + 100, 'warrior_0').setScale(4);
-    const mg = this.add.sprite(VIEW_W / 2 + 60, cy + 100, 'mage_0').setScale(4).setFlipX(true);
+    const w = this.add.sprite(VIEW_W / 2 - 60, cy + 90, 'warrior5_0').setScale(4);
+    const mg = this.add.sprite(VIEW_W / 2 + 60, cy + 90, 'mage5_0').setScale(4).setFlipX(true);
     this.tweens.add({ targets: [w, mg], y: '-=14', duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     c.add([dim, title, sub, statsText, w, mg]);
-    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 220, 'タイトルへもどる', 0xffb347, () => this.toTitle()));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 210, 'タイトルへもどる', 0xffb347, () => this.toTitle()));
     this.overlay = c;
   }
 
@@ -471,13 +493,14 @@ export default class HudScene extends Phaser.Scene {
 
     this.drawBars();
     this.drawBossBar();
-    this.stageText.setText(ui.stageName);
-    this.killText.setText(ui.boss ? 'ボスを倒せ!' : `討伐 ${ui.kills} / ${ui.quota}`);
+    this.stageText.setText(`第 ${ui.floor} 階 / ${ui.total}`);
+    this.killText.setText(`${ui.floorName}\n推奨 Lv.${ui.reqLevel}`);
+    this.killText.setColor(ui.underLeveled ? '#ff8a8a' : '#dcd2ff');
 
     ui.skills.forEach((s, i) => {
       const btn = this.skillBtns[i];
       if (!btn) return;
-      if (btn.label && btn.label.text !== s.label) btn.label.setText(s.label);
+      if (btn.label && btn.label.text !== s.name) btn.label.setText(s.name);
       const mpLabel = `MP${fmt(s.mp)}`;
       if (btn.sub && btn.sub.text !== mpLabel) btn.sub.setText(mpLabel);
       this.drawCooldown(btn, s.cdLeft, s.cd);

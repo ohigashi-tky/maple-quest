@@ -1,59 +1,58 @@
 // ============================================================
-// ゲームデータ定義: キャラクター / スキル / 敵 / ステージ
+// ゲームデータ定義: キャラクター / 5次転職 / スキル / 20階層ダンジョン
+// 道場形式: 雑魚なし、各階層にボス。5階層ごとに強力なボス。
+// レベルは永続化され、自分の強さでどこまで登れるかに挑戦する。
 // ============================================================
 
 export type CharKey = 'warrior' | 'mage';
 
-// スキルは「種類 + パラメータ」で定義し、転職で強化版に差し替わる
+// スキル種別(多段ヒット対応)
 export type SkillKind =
-  | 'melee'      // 前方斬撃
-  | 'aoe'        // 自分中心の範囲攻撃
-  | 'rush'       // 突進
-  | 'wave'       // 地面を走る衝撃波(コーマ)
-  | 'shout'      // 範囲+スタン(シャウト)
-  | 'buff'       // 自己強化(アイアンボディ/インレイジ)
-  | 'projectile' // 弾(エナジーボルト/ファイアアロー)
-  | 'thunder'    // 落雷(サンダーボルト)
-  | 'freeze'     // 範囲+凍結(アイスストライク)
-  | 'meteor'     // メテオ
-  | 'chain'      // チェーンライトニング
-  | 'genesis'    // ジェネシス(全体攻撃+大回復)
+  | 'melee'      // 前方多段斬撃
+  | 'aoe'        // 自分中心の範囲多段
+  | 'rush'       // 突進多段
+  | 'wave'       // 地走り衝撃波
+  | 'buff'       // 自己強化
+  | 'projectile' // 貫通弾(多段)
+  | 'thunder'    // 落雷(複数対象/多段)
+  | 'freeze'     // 範囲凍結(多段)
+  | 'chain'      // 連鎖雷
+  | 'meteor'     // 隕石/ブリザード(降下多段)
+  | 'nova'       // 全画面多段
   | 'heal';      // 回復
 
 export interface SkillDef {
   id: string;
-  name: string;
-  label: string; // ボタン表示(短)
-  mp: number; // 最大MPに対する消費%(実値はレベルで変動)
-  cd: number; // ms
+  name: string;  // 正式技名(ボタンに表示)
+  mp: number;    // 最大MPに対する消費%
+  cd: number;    // ms
   kind: SkillKind;
-  mult: number; // 攻撃倍率
-  hits?: number; // melee/aoe: ヒット数
-  range?: number; // melee: リーチ / thunder・chain: 索敵範囲
-  radius?: number; // aoe/shout/freeze: 半径
-  targets?: number; // thunder/chain/meteor: 最大対象数
-  speed?: number; // projectile: 弾速
-  pierce?: boolean; // projectile: 貫通
-  healPct?: number; // heal/genesis: 最大HP比回復量
-  durMs?: number; // buff/スタン/凍結の持続
-  atkBuff?: number; // buff: 攻撃倍率
-  defCut?: number; // buff: 被ダメージ軽減率(0.5=半減)
+  mult: number;  // 1ヒットあたりの倍率
+  hits: number;  // ヒット数(多段)
+  range?: number;
+  radius?: number;
+  targets?: number;
+  speed?: number;
+  pierce?: boolean;
+  healPct?: number;
+  durMs?: number;
+  atkBuff?: number;
+  defCut?: number;
 }
 
-// 転職ティア: 到達レベルでジョブ名・見た目・スキルが変わる
 export interface JobTier {
   minLevel: number;
   jobName: string;
-  rankName: string; // 「1次」「2次」「3次」
+  rankName: string;  // 「1次」〜「5次」
   spriteKey: string;
   atkBonus: number;
-  skills: SkillDef[];
+  skills: SkillDef[];  // 3スキル
 }
 
 export interface CharDef {
   key: CharKey;
   name: string;
-  maxhp: number; // Lv1基準値
+  maxhp: number;
   maxmp: number;
   atk: number;
   speed: number;
@@ -61,339 +60,338 @@ export interface CharDef {
   tiers: JobTier[];
 }
 
-export const JOB_LEVELS = [1, 5, 10]; // 1次 / 2次 / 3次転職レベル
+// 転職レベル: 1次=Lv1 / 2次=30 / 3次=60 / 4次=100 / 5次=150
+export const JOB_LEVELS = [1, 30, 60, 100, 150];
+export const LEVEL_CAP = 250;
 
 export const CHARACTERS: Record<CharKey, CharDef> = {
+  // ========== 戦士: ダークナイト系列(剣士→スピアマン→ドラゴンナイト→ダークナイト) ==========
   warrior: {
     key: 'warrior',
-    name: '剣士',
-    maxhp: 300,
+    name: '戦士',
+    maxhp: 360,
     maxmp: 120,
-    atk: 22,
-    speed: 120,
-    jump: 330,
+    atk: 24,
+    speed: 122,
+    jump: 335,
     tiers: [
       {
-        minLevel: JOB_LEVELS[0], jobName: '剣士', rankName: '1次', spriteKey: 'warrior', atkBonus: 1,
+        minLevel: 1, jobName: '剣士', rankName: '1次', spriteKey: 'warrior', atkBonus: 1,
         skills: [
-          { id: 'power1', name: 'パワーストライク', label: '強撃', mp: 6, cd: 1100, kind: 'melee', mult: 2.6, hits: 2, range: 38 },
-          { id: 'blast1', name: 'スラッシュブラスト', label: '乱舞', mp: 12, cd: 3600, kind: 'aoe', mult: 2.3, hits: 1, radius: 72 },
-          { id: 'iron1', name: 'アイアンボディ', label: '鉄壁', mp: 14, cd: 12000, kind: 'buff', mult: 0, durMs: 8000, defCut: 0.5 },
+          { id: 'w1a', name: 'パワーストライク', mp: 6, cd: 700, kind: 'melee', mult: 1.6, hits: 2, range: 40 },
+          { id: 'w1b', name: 'スラッシュブラスト', mp: 10, cd: 1400, kind: 'aoe', mult: 1.2, hits: 2, radius: 66 },
+          { id: 'w1c', name: 'アイアンボディ', mp: 12, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
         ],
       },
       {
-        minLevel: JOB_LEVELS[1], jobName: 'クルセイダー', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.3,
+        minLevel: 30, jobName: 'スピアマン', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.25,
         skills: [
-          { id: 'combo2', name: 'コンボアタック', label: '連撃', mp: 8, cd: 1000, kind: 'melee', mult: 2.9, hits: 3, range: 44 },
-          { id: 'shout2', name: 'シャウト', label: '咆哮', mp: 16, cd: 4500, kind: 'shout', mult: 3.0, radius: 95, durMs: 1600 },
-          { id: 'coma2', name: 'コーマ', label: '衝撃波', mp: 14, cd: 3800, kind: 'wave', mult: 3.6 },
+          { id: 'w2a', name: 'スピアクラッシュ', mp: 7, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
+          { id: 'w2b', name: 'ファイナルアタック', mp: 12, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
+          { id: 'w2c', name: 'ハイパーボディ', mp: 16, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.3, defCut: 0.6 },
         ],
       },
       {
-        minLevel: JOB_LEVELS[2], jobName: 'ヒーロー', rankName: '3次', spriteKey: 'warrior3', atkBonus: 1.6,
+        minLevel: 60, jobName: 'ドラゴンナイト', rankName: '3次', spriteKey: 'warrior3', atkBonus: 1.55,
         skills: [
-          { id: 'brand3', name: 'ブランディッシュ', label: '極撃', mp: 9, cd: 950, kind: 'melee', mult: 3.6, hits: 4, range: 54 },
-          { id: 'rush3', name: '突進(ラッシュ)', label: '突進', mp: 12, cd: 3400, kind: 'rush', mult: 4.0 },
-          { id: 'rage3', name: 'インレイジ', label: '激怒', mp: 20, cd: 14000, kind: 'buff', mult: 0, durMs: 10000, atkBuff: 1.6 },
+          { id: 'w3a', name: 'ドラゴンバスター', mp: 8, cd: 800, kind: 'melee', mult: 1.7, hits: 4, range: 56 },
+          { id: 'w3b', name: 'ドラゴンフューリー', mp: 14, cd: 1700, kind: 'aoe', mult: 1.5, hits: 4, radius: 90 },
+          { id: 'w3c', name: 'ドラゴンブラッド', mp: 18, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
+        ],
+      },
+      {
+        minLevel: 100, jobName: 'ダークナイト', rankName: '4次', spriteKey: 'warrior4', atkBonus: 2.0,
+        skills: [
+          { id: 'w4a', name: 'サウザンドスピア', mp: 10, cd: 850, kind: 'melee', mult: 1.6, hits: 6, range: 62 },
+          { id: 'w4b', name: 'ガングニールの降臨', mp: 18, cd: 2000, kind: 'aoe', mult: 1.8, hits: 5, radius: 110 },
+          { id: 'w4c', name: 'ビホルダー', mp: 22, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.5 },
+        ],
+      },
+      {
+        minLevel: 150, jobName: 'ダークナイト・極', rankName: '5次', spriteKey: 'warrior5', atkBonus: 2.6,
+        skills: [
+          { id: 'w5a', name: 'ダークインペール', mp: 12, cd: 800, kind: 'melee', mult: 1.9, hits: 8, range: 70 },
+          { id: 'w5b', name: 'ガングニールの咆哮', mp: 22, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
+          { id: 'w5c', name: 'リインカーネーション', mp: 28, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 13000, atkBuff: 1.8, defCut: 0.5 },
         ],
       },
     ],
   },
+  // ========== 魔法使い: アークメイジ(氷雷)系列(魔法使い→ウィザード→メイジ→アークメイジ) ==========
   mage: {
     key: 'mage',
     name: '魔法使い',
-    maxhp: 200,
-    maxmp: 200,
-    atk: 18,
-    speed: 115,
-    jump: 320,
+    maxhp: 240,
+    maxmp: 220,
+    atk: 20,
+    speed: 116,
+    jump: 322,
     tiers: [
       {
-        minLevel: JOB_LEVELS[0], jobName: '魔法使い', rankName: '1次', spriteKey: 'mage', atkBonus: 1,
+        minLevel: 1, jobName: '魔法使い', rankName: '1次', spriteKey: 'mage', atkBonus: 1,
         skills: [
-          { id: 'bolt1', name: 'エナジーボルト', label: '魔弾', mp: 7, cd: 1300, kind: 'projectile', mult: 2.8, speed: 220, pierce: false },
-          { id: 'thunder1', name: 'サンダーボルト', label: '雷撃', mp: 16, cd: 4200, kind: 'thunder', mult: 2.6, targets: 4, range: 115 },
-          { id: 'heal1', name: 'ヒール', label: '回復', mp: 14, cd: 7000, kind: 'heal', mult: 0, healPct: 0.45 },
+          { id: 'm1a', name: 'エナジーボルト', mp: 6, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
+          { id: 'm1b', name: 'マジッククロー', mp: 9, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
+          { id: 'm1c', name: 'マジックガード', mp: 12, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
         ],
       },
       {
-        minLevel: JOB_LEVELS[1], jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.3,
+        minLevel: 30, jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.25,
         skills: [
-          { id: 'fire2', name: 'ファイアアロー', label: '火矢', mp: 9, cd: 1100, kind: 'projectile', mult: 3.2, speed: 300, pierce: true },
-          { id: 'ice2', name: 'アイスストライク', label: '氷撃', mp: 16, cd: 4200, kind: 'freeze', mult: 3.0, radius: 90, durMs: 2200 },
-          { id: 'heal2', name: 'ヒーリング', label: '回復改', mp: 18, cd: 6500, kind: 'heal', mult: 0, healPct: 0.65 },
+          { id: 'm2a', name: 'コールドビーム', mp: 8, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 1800 },
+          { id: 'm2b', name: 'サンダーボルト', mp: 12, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
+          { id: 'm2c', name: 'メディテーション', mp: 16, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.35 },
         ],
       },
       {
-        minLevel: JOB_LEVELS[2], jobName: 'アークメイジ', rankName: '3次', spriteKey: 'mage3', atkBonus: 1.6,
+        minLevel: 60, jobName: 'メイジ', rankName: '3次', spriteKey: 'mage3', atkBonus: 1.55,
         skills: [
-          { id: 'meteor3', name: 'メテオ', label: '隕石', mp: 14, cd: 3000, kind: 'meteor', mult: 4.2, targets: 5 },
-          { id: 'chain3', name: 'チェーンライトニング', label: '連雷', mp: 16, cd: 3400, kind: 'chain', mult: 3.8, targets: 8, range: 160 },
-          { id: 'genesis3', name: 'ジェネシス', label: '聖光', mp: 28, cd: 9000, kind: 'genesis', mult: 4.6, healPct: 1.0 },
+          { id: 'm3a', name: 'アイスストライク', mp: 10, cd: 1100, kind: 'freeze', mult: 1.6, hits: 3, radius: 100, durMs: 2200 },
+          { id: 'm3b', name: 'ライトニングボルト', mp: 14, cd: 1500, kind: 'thunder', mult: 1.5, hits: 1, targets: 5, range: 130 },
+          { id: 'm3c', name: 'スペルブースター', mp: 18, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
+        ],
+      },
+      {
+        minLevel: 100, jobName: 'アークメイジ', rankName: '4次', spriteKey: 'mage4', atkBonus: 2.0,
+        skills: [
+          { id: 'm4a', name: 'ブリザード', mp: 14, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 2000 },
+          { id: 'm4b', name: 'チェーンライトニング', mp: 16, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
+          { id: 'm4c', name: 'イフリート', mp: 22, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.55 },
+        ],
+      },
+      {
+        minLevel: 150, jobName: 'アークメイジ・極', rankName: '5次', spriteKey: 'mage5', atkBonus: 2.6,
+        skills: [
+          { id: 'm5a', name: 'フローズンオーブ', mp: 14, cd: 1000, kind: 'projectile', mult: 1.8, hits: 4, speed: 300, pierce: true },
+          { id: 'm5b', name: 'サンダーブレイク', mp: 22, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
+          { id: 'm5c', name: 'ブリザードストーム', mp: 26, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 2400 },
         ],
       },
     ],
   },
 };
 
-// 現在レベルで適用されるジョブティアを返す
 export function tierIndexFor(def: CharDef, level: number): number {
   let idx = 0;
-  def.tiers.forEach((t, i) => {
-    if (level >= t.minLevel) idx = i;
-  });
+  def.tiers.forEach((t, i) => { if (level >= t.minLevel) idx = i; });
   return idx;
 }
-
 export function tierFor(def: CharDef, level: number): JobTier {
   return def.tiers[tierIndexFor(def, level)];
 }
 
 // ============================================================
-// 成長式(メイプル風のインフレ成長)
+// 成長式(レベル1〜250想定の指数成長)
 // ============================================================
-export const HP_CAP = 30000;
-export const MP_CAP = 5000;
-
-// 攻撃力: レベル毎に約1.9倍 → 終盤は数十万ダメージ
 export function atkScale(level: number): number {
-  return Math.pow(1.9, level - 1);
+  // 二次成長: 大きな数字になるが青天井すぎない
+  return level * level;
 }
-
 export function hpScale(base: number, level: number): number {
-  return Math.min(HP_CAP, Math.round(base * Math.pow(1.55, level - 1)));
+  return Math.floor(base * Math.pow(level, 1.65));
 }
-
 export function mpScale(base: number, level: number): number {
-  return Math.min(MP_CAP, Math.round(base * Math.pow(1.5, level - 1)));
+  return Math.floor(base * Math.pow(level, 1.3));
 }
-
-// クリティカル率: 15% から成長して最大60%
 export function critRate(level: number): number {
-  return Math.min(0.6, 0.15 + (level - 1) * 0.035);
+  return Math.min(0.6, 0.12 + (level - 1) * 0.012);
 }
-
-// クリティカル倍率: 1.5倍 → 最大2.0倍
 export function critMul(level: number): number {
-  return 1.5 + Math.min(0.5, (level - 1) * 0.04);
+  return 1.5 + Math.min(0.6, (level - 1) * 0.01);
 }
-
-// レベルアップに必要な経験値(指数)
+// レベルアップ必要経験値
 export function expForLevel(lv: number): number {
-  return Math.round(50 * Math.pow(1.7, lv - 1));
+  return Math.floor(40 * Math.pow(lv, 2.1));
+}
+
+// 参照値(バランス計算用)
+function refAtk(level: number): number {
+  return 24 * atkScale(level) * 1.4; // 平均ジョブ補正込み
+}
+function refHp(level: number): number {
+  return 300 * Math.pow(level, 1.65);
 }
 
 // ============================================================
-// 敵
+// 20階層ダンジョン(道場)
 // ============================================================
-export interface EnemyDef {
-  key: string;
-  name: string;
-  hp: number; // 基準値(ステージ係数で増幅)
-  atk: number;
-  exp: number;
-  speed: number;
-  fly?: boolean;
-  hop?: boolean;
+export type Theme = 'grass' | 'sky' | 'dark' | 'void';
+
+export interface FloorDef {
+  floor: number;
+  bossKey: string;
+  bossName: string;
+  title: string;
+  reqLevel: number;   // 推奨レベル(これ未満だとMISS頻発&被弾大)
+  major: boolean;     // 5階層ごとの強敵
+  theme: Theme;
+  archetype: BossArchetype;
+  tint: number;       // ボスの配色
   scale: number;
 }
 
-export const ENEMIES: Record<string, EnemyDef> = {
-  snail: { key: 'snail', name: 'ブルースネイル', hp: 40, atk: 9, exp: 10, speed: 14, scale: 1 },
-  mushroom: { key: 'mushroom', name: 'オレンジマッシュ', hp: 65, atk: 13, exp: 16, speed: 30, hop: true, scale: 1 },
-  slime: { key: 'slime', name: 'スパイクスライム', hp: 85, atk: 17, exp: 22, speed: 26, hop: true, scale: 1 },
-  pig: { key: 'pig', name: 'アーマーブタ', hp: 110, atk: 21, exp: 28, speed: 48, scale: 1 },
-  bat: { key: 'bat', name: 'デビルバット', hp: 95, atk: 25, exp: 34, speed: 42, fly: true, scale: 1 },
-  zombieshroom: { key: 'zombieshroom', name: 'カオスマッシュ', hp: 150, atk: 30, exp: 45, speed: 32, hop: true, scale: 1 },
-};
+export type BossArchetype = 'mush' | 'demon' | 'drake' | 'golem' | 'beast' | 'lord';
 
-export interface BossDef extends EnemyDef {
-  title: string;
+// MapleStoryのエリア/ダンジョンボスを弱→強で配置(★=5階層ごとの強敵)
+interface FloorSeed {
+  key: string; name: string; title: string; req: number;
+  arch: BossArchetype; tint: number; major?: boolean; scale?: number;
 }
+const FLOOR_SEEDS: FloorSeed[] = [
+  { key: 'mushmom', name: 'マッシュモム', title: '森の主', req: 1, arch: 'mush', tint: 0xef7d2f, scale: 1.4 },
+  { key: 'bluemushmom', name: 'ブルーマッシュモム', title: '青き森の主', req: 8, arch: 'mush', tint: 0x5a8fe0, scale: 1.45 },
+  { key: 'faust', name: 'ファウスト', title: '闇の従者', req: 16, arch: 'demon', tint: 0x7a52b4, scale: 1.4 },
+  { key: 'dyle', name: 'ダイル', title: '沼の捕食者', req: 24, arch: 'drake', tint: 0x4a9c3a, scale: 1.45 },
+  { key: 'jrbalrog', name: 'ジュニアバルログ', title: '小さき災い', req: 32, arch: 'demon', tint: 0xc04a2a, major: true, scale: 1.7 },
 
-export const BOSSES: Record<string, BossDef> = {
-  mushmom: {
-    key: 'mushmom', name: 'マッシュモム', title: '森の主',
-    hp: 1100, atk: 26, exp: 350, speed: 40, scale: 1.4,
-  },
-  pinkbean: {
-    key: 'pinkbean', name: 'ピンクビーン', title: 'いたずらな神獣',
-    hp: 1800, atk: 32, exp: 800, speed: 50, scale: 1.5,
-  },
-  cygnus: {
-    key: 'cygnus', name: 'シグナス', title: '闇に堕ちた女帝',
-    hp: 2800, atk: 40, exp: 2000, speed: 55, fly: true, scale: 1.5,
-  },
-};
+  { key: 'stumpy', name: 'スタンピー', title: '怒れる古木', req: 42, arch: 'golem', tint: 0x8a5a32, scale: 1.5 },
+  { key: 'griffey', name: 'グリフィー', title: '天空の猛禽', req: 52, arch: 'beast', tint: 0xe0a030, scale: 1.5 },
+  { key: 'manon', name: 'マノン', title: '古龍', req: 64, arch: 'drake', tint: 0xd86a9c, scale: 1.55 },
+  { key: 'anego', name: 'アネゴ', title: '夜叉の女傑', req: 76, arch: 'lord', tint: 0xd84a6a, scale: 1.45 },
+  { key: 'crimsonbalrog', name: 'クリムゾンバルログ', title: '深紅の魔王', req: 88, arch: 'demon', tint: 0xd81a1a, major: true, scale: 1.95 },
 
-export interface PlatformDef { x: number; y: number; w: number; oneway?: boolean }
+  { key: 'dunas', name: 'デュナス', title: '機械龍', req: 100, arch: 'drake', tint: 0x4a7fd6, scale: 1.6 },
+  { key: 'pierre', name: 'ピエール', title: '深淵の道化', req: 112, arch: 'lord', tint: 0xb04ad8, scale: 1.5 },
+  { key: 'vonleon', name: 'ヴァンレオン', title: '獅子王', req: 124, arch: 'lord', tint: 0x3a6ae8, scale: 1.55 },
+  { key: 'hilla', name: 'ヒルラ', title: '血の魔女', req: 136, arch: 'lord', tint: 0x8a1a4a, scale: 1.5 },
+  { key: 'zakum', name: 'ザクム', title: '炎の巨神', req: 150, arch: 'golem', tint: 0xd8541a, major: true, scale: 2.1 },
 
-export interface StageDef {
-  name: string;
-  sub: string;
-  theme: 'grass' | 'sky' | 'dark';
-  tile: string;
-  width: number;
-  quota: number; // ボス出現に必要な討伐数
-  mobs: [string, number][]; // [enemyKey, 同時出現数]
-  boss: string;
-  platforms: PlatformDef[];
-  bgm: 'grass' | 'sky' | 'dark';
-  // ステージ係数(プレイヤーのインフレ成長に合わせる)
-  mobHpMul: number;
-  mobAtkMul: number;
-  expMul: number;
-}
-
-export const GROUND_Y = 432; // 地面の上端(ワールド座標)
-export const WORLD_H = 600; // 地面下の土も含めたワールドの高さ
-
-export const STAGES: StageDef[] = [
-  {
-    name: 'ステージ 1',
-    sub: 'ヘネシスの草原',
-    theme: 'grass',
-    tile: 'tile_grass',
-    width: 1600,
-    quota: 12,
-    mobs: [
-      ['snail', 4],
-      ['mushroom', 4],
-    ],
-    boss: 'mushmom',
-    bgm: 'grass',
-    mobHpMul: 1,
-    mobAtkMul: 1,
-    expMul: 1,
-    platforms: [
-      { x: 200, y: 368, w: 128, oneway: true },
-      { x: 420, y: 320, w: 96, oneway: true },
-      { x: 640, y: 368, w: 144, oneway: true },
-      { x: 900, y: 330, w: 112, oneway: true },
-      { x: 1120, y: 376, w: 128, oneway: true },
-      { x: 1340, y: 320, w: 96, oneway: true },
-      { x: 560, y: 264, w: 80, oneway: true },
-      { x: 1020, y: 264, w: 80, oneway: true },
-    ],
-  },
-  {
-    name: 'ステージ 2',
-    sub: 'オルビスの雲海',
-    theme: 'sky',
-    tile: 'tile_sky',
-    width: 1800,
-    quota: 14,
-    mobs: [
-      ['slime', 4],
-      ['pig', 4],
-    ],
-    boss: 'pinkbean',
-    bgm: 'sky',
-    mobHpMul: 30,
-    mobAtkMul: 18,
-    expMul: 8,
-    platforms: [
-      { x: 180, y: 360, w: 112, oneway: true },
-      { x: 400, y: 304, w: 96, oneway: true },
-      { x: 620, y: 360, w: 128, oneway: true },
-      { x: 860, y: 312, w: 96, oneway: true },
-      { x: 1080, y: 368, w: 144, oneway: true },
-      { x: 1320, y: 312, w: 112, oneway: true },
-      { x: 1540, y: 360, w: 112, oneway: true },
-      { x: 520, y: 248, w: 80, oneway: true },
-      { x: 980, y: 248, w: 80, oneway: true },
-      { x: 1430, y: 248, w: 80, oneway: true },
-    ],
-  },
-  {
-    name: 'ステージ 3',
-    sub: '闇の神殿',
-    theme: 'dark',
-    tile: 'tile_dark',
-    width: 2000,
-    quota: 16,
-    mobs: [
-      ['bat', 4],
-      ['zombieshroom', 4],
-    ],
-    boss: 'cygnus',
-    bgm: 'dark',
-    mobHpMul: 600,
-    mobAtkMul: 120,
-    expMul: 60,
-    platforms: [
-      { x: 200, y: 368, w: 128, oneway: true },
-      { x: 440, y: 312, w: 112, oneway: true },
-      { x: 680, y: 368, w: 128, oneway: true },
-      { x: 920, y: 312, w: 112, oneway: true },
-      { x: 1160, y: 368, w: 144, oneway: true },
-      { x: 1400, y: 312, w: 112, oneway: true },
-      { x: 1640, y: 368, w: 128, oneway: true },
-      { x: 560, y: 248, w: 80, oneway: true },
-      { x: 1040, y: 248, w: 80, oneway: true },
-      { x: 1520, y: 248, w: 80, oneway: true },
-    ],
-  },
+  { key: 'horntail', name: 'ホーンテイル', title: '双頭の邪龍', req: 168, arch: 'drake', tint: 0x3aa84a, scale: 1.85 },
+  { key: 'magnus', name: 'マグナス', title: '堕ちた翼', req: 186, arch: 'lord', tint: 0x2a2a3a, scale: 1.6 },
+  { key: 'lucid', name: 'ルシード', title: '夢幻の蝶', req: 204, arch: 'lord', tint: 0x6ad8c4, scale: 1.6 },
+  { key: 'damien', name: 'デミアン', title: '絶望の剣', req: 224, arch: 'lord', tint: 0xc02a3a, scale: 1.65 },
+  { key: 'blackmage', name: 'ブラックマゲ', title: '黒き魔導士', req: 250, arch: 'lord', tint: 0x1a1024, major: true, scale: 2.3 },
 ];
 
-// ボスHPはステージ係数 × さらに3倍
-export const BOSS_HP_MUL = 3;
-
-// ============================================================
-// 進行状態
-// ============================================================
-export interface CharState {
-  hp: number;
-  mp: number;
+function themeForFloor(f: number): Theme {
+  if (f <= 5) return 'grass';
+  if (f <= 10) return 'sky';
+  if (f <= 15) return 'dark';
+  return 'void';
 }
 
+export function themeTile(theme: Theme): string {
+  return `tile_${theme}`;
+}
+export function themeBgm(theme: Theme): 'grass' | 'sky' | 'dark' | 'boss' {
+  return theme === 'void' ? 'boss' : theme;
+}
+
+export const FLOORS: FloorDef[] = FLOOR_SEEDS.map((s, i) => ({
+  floor: i + 1,
+  bossKey: s.key,
+  bossName: s.name,
+  title: s.title,
+  reqLevel: s.req,
+  major: !!s.major,
+  theme: themeForFloor(i + 1),
+  archetype: s.arch,
+  tint: s.tint,
+  scale: s.scale ?? 1.5,
+}));
+
+export const TOTAL_FLOORS = FLOORS.length;
+export const GROUND_Y = 432;
+export const WORLD_H = 600;
+export const ARENA_W = 720; // 道場アリーナの横幅(コンパクト)
+
+// ボスのステータス(階層と推奨レベルから算出)
+export function bossHp(f: FloorDef): number {
+  return Math.round(refAtk(f.reqLevel) * (f.major ? 130 : 60));
+}
+export function bossAtk(f: FloorDef): number {
+  return Math.round(refHp(f.reqLevel) * (f.major ? 0.16 : 0.11));
+}
+export function bossExp(f: FloorDef): number {
+  return Math.round(expForLevel(f.reqLevel) * (f.major ? 0.55 : 0.32));
+}
+
+// ============================================================
+// レベル差による命中(MISS)とダメージ補正
+// ============================================================
+// プレイヤー→敵の命中率(推奨レベルに対して低いとMISS頻発)
+export function playerHitChance(playerLevel: number, reqLevel: number): number {
+  const diff = playerLevel - reqLevel;
+  if (diff >= 0) return 1;
+  return Math.max(0.1, 1 + diff * 0.055); // 1レベル不足ごとに-5.5%、下限10%
+}
+// レベル不足だと与ダメージも減る(格上補正)
+export function playerDamageScale(playerLevel: number, reqLevel: number): number {
+  const diff = playerLevel - reqLevel;
+  if (diff >= 0) return 1;
+  return Math.max(0.25, 1 + diff * 0.04);
+}
+// 敵→プレイヤーの被ダメージ補正(格上ほど痛い)
+export function enemyDamageScale(playerLevel: number, reqLevel: number): number {
+  const diff = reqLevel - playerLevel;
+  if (diff <= 0) return 1;
+  return 1 + diff * 0.05;
+}
+
+// ============================================================
+// 進行状態 & 永続化
+// ============================================================
+export interface CharState { hp: number; mp: number; }
+
 export interface Progress {
-  stage: number;
+  floor: number;       // 現在の階層(1始まり)
   level: number;
   exp: number;
   charKey: CharKey;
   chars: Record<CharKey, CharState>;
-  elixirs: number; // エリクサー(HP/MP全回復)
-  kills: number;
+  elixirs: number;
   startTime: number;
 }
 
 export const ELIXIR_MAX = 30;
 
-export function newProgress(stage = 0): Progress {
+export interface SaveData {
+  level: number;
+  exp: number;
+  charKey: CharKey;
+  highestFloor: number;  // これまでの到達最高階層
+  clears: number;        // ダンジョン完全制覇回数
+}
+
+const SAVE_KEY = 'maple-quest-save-v2';
+
+export function loadSave(): SaveData {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw) as SaveData;
+      return {
+        level: Math.max(1, Math.min(LEVEL_CAP, s.level || 1)),
+        exp: Math.max(0, s.exp || 0),
+        charKey: s.charKey === 'mage' ? 'mage' : 'warrior',
+        highestFloor: Math.max(1, s.highestFloor || 1),
+        clears: s.clears || 0,
+      };
+    }
+  } catch { /* ignore */ }
+  return { level: 1, exp: 0, charKey: 'warrior', highestFloor: 1, clears: 0 };
+}
+
+export function writeSave(s: SaveData) {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* ignore */ }
+}
+
+export function newProgress(save: SaveData): Progress {
   return {
-    stage,
-    level: 1,
-    exp: 0,
-    charKey: 'warrior',
+    floor: 1,
+    level: save.level,
+    exp: save.exp,
+    charKey: save.charKey,
     chars: {
-      warrior: { hp: CHARACTERS.warrior.maxhp, mp: CHARACTERS.warrior.maxmp },
-      mage: { hp: CHARACTERS.mage.maxhp, mp: CHARACTERS.mage.maxmp },
+      warrior: { hp: hpScale(CHARACTERS.warrior.maxhp, save.level), mp: mpScale(CHARACTERS.warrior.maxmp, save.level) },
+      mage: { hp: hpScale(CHARACTERS.mage.maxhp, save.level), mp: mpScale(CHARACTERS.mage.maxmp, save.level) },
     },
-    elixirs: 10,
-    kills: 0,
+    elixirs: 12,
     startTime: Date.now(),
   };
 }
 
-// 大きい数値の表示用フォーマット
+// 数値表示(桁区切り)
 export function fmt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
-}
-
-const SAVE_KEY = 'maple-quest-save';
-
-export function saveStage(stage: number) {
-  try {
-    const prev = loadSavedStage();
-    if (stage > prev) localStorage.setItem(SAVE_KEY, String(stage));
-  } catch { /* private mode等は無視 */ }
-}
-
-export function loadSavedStage(): number {
-  try {
-    return Math.min(Number(localStorage.getItem(SAVE_KEY) || 0), STAGES.length - 1);
-  } catch {
-    return 0;
-  }
 }

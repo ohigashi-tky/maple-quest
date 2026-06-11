@@ -1042,7 +1042,7 @@ const CLOUD: SpriteDef = {
 // ============================================================
 // タイルテクスチャ(プロシージャル生成)
 // ============================================================
-function makeTile(scene: Phaser.Scene, key: string, theme: 'grass' | 'sky' | 'dark') {
+function makeTile(scene: Phaser.Scene, key: string, theme: 'grass' | 'sky' | 'dark' | 'void') {
   const size = 16;
   const tex = scene.textures.createCanvas(key, size, size)!;
   const ctx = tex.getContext();
@@ -1077,7 +1077,7 @@ function makeTile(scene: Phaser.Scene, key: string, theme: 'grass' | 'sky' | 'da
       ctx.fillRect(Math.floor(r() * size), 6 + Math.floor(r() * 10), 3, 2);
     ctx.fillStyle = '#aabfdd';
     ctx.fillRect(0, size - 2, size, 2);
-  } else {
+  } else if (theme === 'dark') {
     ctx.fillStyle = '#3a3050';
     ctx.fillRect(0, 0, size, size);
     ctx.fillStyle = '#4a3f66';
@@ -1090,6 +1090,19 @@ function makeTile(scene: Phaser.Scene, key: string, theme: 'grass' | 'sky' | 'da
     // 紫の光る模様
     ctx.fillStyle = '#7a5acc';
     if (r() > 0.4) ctx.fillRect(Math.floor(r() * 12) + 2, 8, 2, 2);
+  } else {
+    // void: 虚無の黒に明滅する深紅・紫の裂け目
+    ctx.fillStyle = '#16101f';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#241830';
+    ctx.fillRect(0, 0, size, 4);
+    ctx.fillStyle = '#3a2448';
+    ctx.fillRect(0, 0, size, 2);
+    ctx.fillStyle = '#0e0a16';
+    for (let i = 0; i < 8; i++)
+      ctx.fillRect(Math.floor(r() * size), 5 + Math.floor(r() * 10), 3, 2);
+    ctx.fillStyle = r() > 0.5 ? '#a02a4a' : '#5a2a9c';
+    if (r() > 0.35) ctx.fillRect(Math.floor(r() * 12) + 2, 7, 2, 3);
   }
   tex.refresh();
 
@@ -1111,11 +1124,18 @@ function makeTile(scene: Phaser.Scene, key: string, theme: 'grass' | 'sky' | 'da
       dctx.fillStyle = r2() > 0.5 ? '#aabfdd' : '#d4e2f4';
       dctx.fillRect(Math.floor(r2() * size), Math.floor(r2() * size), 3, 2);
     }
-  } else {
+  } else if (theme === 'dark') {
     dctx.fillStyle = '#2c2440';
     dctx.fillRect(0, 0, size, size);
     for (let i = 0; i < 12; i++) {
       dctx.fillStyle = r2() > 0.5 ? '#241d36' : '#3a3050';
+      dctx.fillRect(Math.floor(r2() * size), Math.floor(r2() * size), 3, 2);
+    }
+  } else {
+    dctx.fillStyle = '#100a18';
+    dctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 12; i++) {
+      dctx.fillStyle = r2() > 0.5 ? '#0a0612' : '#241830';
       dctx.fillRect(Math.floor(r2() * size), Math.floor(r2() * size), 3, 2);
     }
   }
@@ -1125,6 +1145,300 @@ function makeTile(scene: Phaser.Scene, key: string, theme: 'grass' | 'sky' | 'da
 // ============================================================
 // 生成本体
 // ============================================================
+// ============================================================
+// ボス・アーキタイプ(グレースケールで描画 → ボスごとに色を乗算tint)
+// b=ボディ d=陰 w=highlight o=輪郭 k=目 で統一
+// ============================================================
+const ARCH_PAL: Palette = {
+  o: '#241a28', b: '#c8c8d0', d: '#8a8a96', w: '#ffffff', k: '#1a1020', g: '#f0f0f0',
+};
+
+// demon: 角と翼の魔神(ジュニア/クリムゾンバルログ・ファウスト)
+const A_DEMON: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      'o..o..............o..o..',
+      'oo.oo....oooo....oo.oo...',
+      '.ooo....obbbbo....ooo....',
+      '..o....obbbbbbo....o.....',
+      'ooo...obbbbbbbbo...ooo...',
+      'oddoo.obwkbbkwbo.ooddo...',
+      'odddooobbbbbbbboooddddo..',
+      '.oddddobbbbbbbbodddddo...',
+      '..oddddbbbbbbbbdddddo....',
+      '...oddbbbbwwbbbbddo......',
+      '....obbbbwwwwbbbbo.......',
+      '....obbbdbbbbdbbbo.......',
+      '....obbbbbbbbbbbbo.......',
+      '.....obbbbbbbbbbo........',
+      '......obbdddbbbo.........',
+      '......obbo..obbo.........',
+      '.....obbo....obbo........',
+      '.....obo......obo........',
+      '....obbo......obbo.......',
+      '....oo..........oo.......',
+    ],
+    [
+      '.o..o............o..o....',
+      'oo.oo.....oooo...oo.oo...',
+      '.ooo.....obbbbo...ooo....',
+      'oo......obbbbbbo.....oo..',
+      'ooo....obbbbbbbbo..ooo...',
+      'oddo...obwkbbkwbo..oddo..',
+      'oddooo.obbbbbbbbo.oooddo.',
+      '.oddddoobbbbbbbboodddddo.',
+      '..odddobbbbbbbbbboddddo..',
+      '...oddbbbbwwbbbbddo......',
+      '....obbbbwwwwbbbbo.......',
+      '....obbbdbbbbdbbbo.......',
+      '....obbbbbbbbbbbbo.......',
+      '.....obbbbbbbbbbo........',
+      '......obbdddbbbo.........',
+      '......obbo..obbo.........',
+      '......obo....obo.........',
+      '......obo....obo.........',
+      '.....obbo....obbo.......',
+      '.....oo........oo.......',
+    ],
+  ],
+};
+
+// drake: 角と鱗の竜(ダイル・マノン・デュナス・ホーンテイル)
+const A_DRAKE: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      '...........o....o.......',
+      '..........oo....oo......',
+      '.oo........o.bb.o.......',
+      'obbo.....obbbbbbbo......',
+      '.obbo...obbwkbbkwbo.....',
+      '..obboobbbbbbbbbbbbo....',
+      '...obbbbbbbbbbbbbbbbo...',
+      '...obbbdddbbbbbbdddbo...',
+      '....obbbbbbbbbbbbbbo....',
+      '.ooobbbbbbbbbbbbbbbo....',
+      'obbbbbbbbwwwwbbbbbboo...',
+      'obbbbbbbwwwwwwbbbbbbbo..',
+      '.obbbbbbbwwwwbbbbbbbbbo.',
+      '..oobbbbbbbbbbbbbbbbboo.',
+      '....obbbbbbbbbbbbbbbo...',
+      '....obbo.obbo.obbo.o....',
+      '....obo...obo..obo......',
+      '...obbo...obbo.obbo.....',
+      '...oo......oo...oo......',
+    ],
+    [
+      '...........o....o.......',
+      '...........o....o.......',
+      '.oo.......oo.bb.oo......',
+      'obbo.....obbbbbbbo......',
+      '.obboo..obbwkbbkwbo.....',
+      '..obboobbbbbbbbbbbbo....',
+      '...obbbbbbbbbbbbbbbbo...',
+      '...obbbdddbbbbbbdddbo...',
+      '...obbbbbbbbbbbbbbbbo...',
+      '.ooobbbbbbbbbbbbbbbbo...',
+      'obbbbbbbbwwwwbbbbbbboo..',
+      'obbbbbbbwwwwwwbbbbbbbbo.',
+      '.obbbbbbbwwwwbbbbbbbbbo.',
+      '..oobbbbbbbbbbbbbbbbboo.',
+      '....obbbbbbbbbbbbbbbo...',
+      '...obbo.obbo..obbo.obo..',
+      '...obo...obo...obo.obo..',
+      '..obbo...obbo..obbobbo..',
+      '..oo......oo....oooo....',
+    ],
+  ],
+};
+
+// golem: 岩と溶岩の巨人(スタンピー・ザクム)
+const A_GOLEM: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      '......oooooooooooo......',
+      '....ooddbbbbbbbbddoo....',
+      '...obbbbbbbbbbbbbbbbo...',
+      '..obbdbbbbbbbbbbbbdbbo..',
+      '..obbbbwkbbbbbbkwbbbbo..',
+      '..obbbbbbbbbbbbbbbbbbo..',
+      '.obbbbbbwwwwwwwwbbbbbbo.',
+      '.obbbbbbwddddddwbbbbbbo.',
+      '.obbbbbbbbbbbbbbbbbbbbo.',
+      'obbdbbbbbbbbbbbbbbbbdbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbo',
+      'oobbbbbbbbbbbbbbbbbbbboo',
+      '.obbbbbbbbbbbbbbbbbbbbo.',
+      'obbo.obbbbbbbbbbbbo.obbo',
+      'obbo..obbbbbbbbbbo..obbo',
+      'obbo..obbo....obbo..obbo',
+      'oooo..oooo....oooo..oooo',
+    ],
+    [
+      '......oooooooooooo......',
+      '....ooddbbbbbbbbddoo....',
+      '...obbbbbbbbbbbbbbbbo...',
+      '..obbdbbbbbbbbbbbbdbbo..',
+      '..obbbbwkbbbbbbkwbbbbo..',
+      '..obbbbbbbbbbbbbbbbbbo..',
+      '.obbbbbbwwwwwwwwbbbbbbo.',
+      '.obbbbbbwddddddwbbbbbbo.',
+      '.obbbbbbbbbbbbbbbbbbbbo.',
+      'obbdbbbbbbbbbbbbbbbbdbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbo',
+      'oobbbbbbbbbbbbbbbbbbbboo',
+      '.obbbbbbbbbbbbbbbbbbbbo.',
+      'obbo.obbbbbbbbbbbbo.obbo',
+      'obbo.obbbbbbbbbbbbo.obbo',
+      'obbo.obbbo....obbo.obbo.',
+      'oooo.oooo......oooo.ooo.',
+    ],
+  ],
+};
+
+// beast: 翼を広げた猛獣(グリフィー)
+const A_BEAST: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      '..o..............o......',
+      '.obbo....oooo...obbo....',
+      'obbbbo..obbbbo.obbbbo...',
+      'obbbbbo.obwkwbo.obbbbo..',
+      '.obbbbboobbbbbooobbbbo..',
+      '..obbbbbbbbbbbbbbbbbo...',
+      '...obbbbbwwwwbbbbbbo....',
+      '....obbbbwwwwbbbbbo.....',
+      '...obbbbbbbbbbbbbbbo....',
+      '..obbbbbbbbbbbbbbbbbo...',
+      '.obbbbobbbbbbbbobbbbbbo.',
+      'obbbbo.obbbbbbo.obbbbbbo',
+      '.oooo..obbo.obbo.oooooo.',
+      '.......obo...obo........',
+      '......obbo...obbo.......',
+      '......oo.......oo.......',
+    ],
+    [
+      'o................o......',
+      'obbo.....oooo...obbo....',
+      '.obbbo..obbbbo.obbbo....',
+      '..obbbboobwkwboobbbo....',
+      '...obbbbobbbbbbobbbbo...',
+      '....obbbbbbbbbbbbbbo....',
+      '...obbbbbbwwwwbbbbbbo...',
+      '..obbbbbbwwwwwwbbbbbbo..',
+      '..obbbbbbbbbbbbbbbbbbo..',
+      '.obbbbbbbbbbbbbbbbbbbbo.',
+      'obbbbobbbbbbbbbbobbbbbbo',
+      '.oooobbbbbbbbbboo.oooo..',
+      '.....obbo..obbo........',
+      '.....obo....obo........',
+      '....obbo....obbo.......',
+      '....oo........oo.......',
+    ],
+  ],
+};
+
+// lord: マントの人型ボス(アネゴ/ヴァンレオン/マグナス/ルシード/デミアン/ヒルラ/ピエール/ブラックマゲ)
+const A_LORD: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      '.......oo..oo..........',
+      '......obbboobbo........',
+      '......obbbbbbbo........',
+      '.......obbbbbo.........',
+      '......obwkbbkwbo.......',
+      '......obbbbbbbbo.......',
+      '.......obbwwbbo........',
+      '...o....obbbbo....o....',
+      '..obbo.obbbbbbo.obbo...',
+      '.obbbboobbbbbbooobbbo..',
+      '.obbbbbbbbwwbbbbbbbbbo.',
+      '.obbbbbbbbwwbbbbbbbbo..',
+      '..obbbbbbbwwbbbbbbbbo..',
+      '...obbbbbbwwbbbbbbbo...',
+      '....obbbbbbbbbbbbbo....',
+      '....obbbbdbbdbbbbbo....',
+      '....obbbbo..obbbbo.....',
+      '....obbo....obbo.......',
+      '....obo......obo.......',
+      '...obbo......obbo......',
+      '...oo..........oo......',
+    ],
+    [
+      '.......oo..oo..........',
+      '......obbboobbo........',
+      '......obbbbbbbo........',
+      '.......obbbbbo.........',
+      '......obwkbbkwbo.......',
+      '......obbbbbbbbo.......',
+      '.......obbwwbbo........',
+      'o.......obbbbo.......o.',
+      'obbo...obbbbbbo...obbo.',
+      '.obbboobbbbbbbboobbbo..',
+      '..obbbbbbbwwbbbbbbbbo..',
+      '...obbbbbbwwbbbbbbbo...',
+      '...obbbbbbwwbbbbbbbo...',
+      '...obbbbbbwwbbbbbbbo...',
+      '....obbbbbbbbbbbbbo....',
+      '....obbbbdbbdbbbbbo....',
+      '....obbbbo..obbbbo.....',
+      '.....obbo..obbo........',
+      '.....obo....obo........',
+      '....obbo....obbo.......',
+      '....oo........oo.......',
+    ],
+  ],
+};
+
+// mush: 巨大キノコ(マッシュモム/ブルーマッシュモム)
+const A_MUSH: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      '......oooooooo......',
+      '....oobbbbbbbboo....',
+      '...obbwwbbbbbbbbo...',
+      '..obbbwwbbbbbbbbbo..',
+      '..obbbbbbbbbbwwbbo..',
+      '..obbbbbbbbbbwwbbo..',
+      '..obddddddddddddbo..',
+      '...oddddddddddddo...',
+      '....obbbbbbbbbbo....',
+      '....obwkbbbbkwbo....',
+      '....obbbbbbbbbbo....',
+      '....obbbddddbbbo....',
+      '....obbwwwwwwbbo....',
+      '.....obbbbbbbbo.....',
+      '......oo....oo......',
+      '......oo....oo......',
+    ],
+    [
+      '......oooooooo......',
+      '....oobbbbbbbboo....',
+      '...obbwwbbbbbbbbo...',
+      '..obbbwwbbbbbbbbbo..',
+      '..obbbbbbbbbbwwbbo..',
+      '..obbbbbbbbbbwwbbo..',
+      '..obddddddddddddbo..',
+      '...oddddddddddddo...',
+      '....obbbbbbbbbbo....',
+      '....obwkbbbbkwbo....',
+      '....obbbbbbbbbbo....',
+      '....obbbddddbbbo....',
+      '....obbwwwwwwbbo....',
+      '.....obbbbbbbbo.....',
+      '.....oo......oo.....',
+      '....oo........oo....',
+    ],
+  ],
+};
+
 const SPRITES: Record<string, SpriteDef> = {
   warrior: WARRIOR,
   mage: MAGE,
@@ -1137,6 +1451,12 @@ const SPRITES: Record<string, SpriteDef> = {
   mushmom: MUSHMOM,
   pinkbean: PINKBEAN,
   cygnus: CYGNUS,
+  boss_mush: A_MUSH,
+  boss_demon: A_DEMON,
+  boss_drake: A_DRAKE,
+  boss_golem: A_GOLEM,
+  boss_beast: A_BEAST,
+  boss_lord: A_LORD,
   fx_slash: SLASH,
   fx_claw: CLAW,
   fx_fire: FIREBALL,
@@ -1215,13 +1535,20 @@ const CROWN_ROWS = [
   '.....gggggg.....',
 ];
 
-// 帽子の星(魔法使い2次用・上層)
+// 帽子の星(魔法使い用・上層)
 const STAR_ROWS = [
   '................',
   '................',
   '.......z........',
   '......zzz.......',
   '.......z........',
+];
+
+// 角(ダークナイト用・上層)
+const HORN_ROWS = [
+  'd..............d',
+  'dd............dd',
+  '.d............d.',
 ];
 
 // 転職ティアごとの見た目バリエーション(パレット差し替え + 装飾)
@@ -1234,7 +1561,8 @@ interface TierVariant {
 }
 
 const TIER_VARIANTS: TierVariant[] = [
-  // 剣士 → クルセイダー: 鋼の鎧 + 赤マント
+  // ===== 戦士: ダークナイト系列 =====
+  // 2次 スピアマン: 鋼の鎧 + 青マント
   {
     base: 'warrior',
     key: 'warrior2',
@@ -1242,39 +1570,83 @@ const TIER_VARIANTS: TierVariant[] = [
       r: '#7a96c4', R: '#4a628f', e: '#3a6ae8', b: '#3a4258', B: '#272e40',
       X: '#cfe6ff', x: '#8fb0d8',
     },
-    under: { rows: CAPE_ROWS, palette: { c: '#c23a48' } },
+    under: { rows: CAPE_ROWS, palette: { c: '#3a5ac0' } },
   },
-  // クルセイダー → ヒーロー: 黄金の鎧 + 緋色マント + 王冠
+  // 3次 ドラゴンナイト: 竜鱗の青緑鎧 + 緑マント
   {
     base: 'warrior',
     key: 'warrior3',
     palette: {
-      r: '#f2c14e', R: '#c2902a', e: '#d23c3c', b: '#5a3a6b', B: '#3d2749',
-      X: '#fff2c8', x: '#e8c060', g: '#ffe9b0',
+      r: '#3a9c7a', R: '#1f6b52', e: '#7ae0b0', b: '#2a3a4a', B: '#1a2630',
+      X: '#cfe6ff', x: '#8fb0d8', g: '#e0c060',
     },
-    under: { rows: CAPE_ROWS, palette: { c: '#a32433' } },
-    over: { rows: CROWN_ROWS, palette: { g: '#ffd24a' } },
+    under: { rows: CAPE_ROWS, palette: { c: '#2a8c5a' } },
   },
-  // 魔法使い → ウィザード: 紫ローブ + 星付き帽子
+  // 4次 ダークナイト: 漆黒紫の鎧 + 暗紫マント + 角
+  {
+    base: 'warrior',
+    key: 'warrior4',
+    palette: {
+      r: '#4a3a6b', R: '#2a1f44', e: '#9a5ad8', b: '#241a36', B: '#150f22',
+      X: '#b89ae8', x: '#7a5ac0', s: '#d8b89a', S: '#b89478', g: '#9a5ad8',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#3a1f5a' } },
+    over: { rows: HORN_ROWS, palette: { d: '#1a0f28' } },
+  },
+  // 5次 ダークナイト・極: 黒に深紅の輝き + 漆黒マント + 角
+  {
+    base: 'warrior',
+    key: 'warrior5',
+    palette: {
+      r: '#241a30', R: '#120c1a', e: '#e83a4a', b: '#1a1024', B: '#0d0814',
+      X: '#ff5a6a', x: '#c02a3a', s: '#d8b89a', S: '#b89478', g: '#e83a4a',
+      h: '#3a1020', H: '#5a1828',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#5a0a1a' } },
+    over: { rows: HORN_ROWS, palette: { d: '#e83a4a' } },
+  },
+  // ===== 魔法使い: アークメイジ(氷雷)系列 =====
+  // 2次 ウィザード: 紺青のローブ + 星付き帽子
   {
     base: 'mage',
     key: 'mage2',
     palette: {
-      t: '#7a3ac4', T: '#54288f', r: '#8a4ad8', R: '#5f329f', u: '#c8a4ff',
-      j: '#4ae8c4', J: '#c8fff0',
+      t: '#3a4ac4', T: '#26308f', r: '#4a5ad8', R: '#32409f', u: '#a4b8ff',
+      j: '#6ae0ff', J: '#c8f4ff',
     },
-    over: { rows: STAR_ROWS, palette: { z: '#ffd24a' } },
+    over: { rows: STAR_ROWS, palette: { z: '#6ae0ff' } },
   },
-  // ウィザード → アークメイジ: 白金ローブ + マント + 王冠
+  // 3次 メイジ: 氷青のローブ + 星付き帽子
   {
     base: 'mage',
     key: 'mage3',
     palette: {
-      t: '#f4f0ff', T: '#cfc4ea', w: '#ffd24a', r: '#e8e2f8', R: '#b8aed8',
-      u: '#f2c14e', j: '#ff4a8a', J: '#ffd0e0',
+      t: '#3a8ad8', T: '#2660a0', w: '#d8f4ff', r: '#5ab0e8', R: '#3a80b8', u: '#bfeaff',
+      j: '#ffe45a', J: '#fff4c0',
     },
-    under: { rows: CAPE_ROWS, palette: { c: '#6a3ac4' } },
-    over: { rows: CROWN_ROWS, palette: { g: '#ffd24a' } },
+    over: { rows: STAR_ROWS, palette: { z: '#ffe45a' } },
+  },
+  // 4次 アークメイジ: 白氷のローブ + 氷マント + 王冠
+  {
+    base: 'mage',
+    key: 'mage4',
+    palette: {
+      t: '#dff0ff', T: '#a8cae8', w: '#ffffff', y: '#9ad8ff', Y: '#6ab0e0',
+      r: '#cfe8ff', R: '#9ac4e8', u: '#ffffff', j: '#ffe45a', J: '#fff4c0',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#6ab0e8' } },
+    over: { rows: CROWN_ROWS, palette: { g: '#9ad8ff' } },
+  },
+  // 5次 アークメイジ・極: 白金氷のローブ + 氷雷マント + 王冠
+  {
+    base: 'mage',
+    key: 'mage5',
+    palette: {
+      t: '#ffffff', T: '#cfe0f0', w: '#ffe45a', y: '#ffd24a', Y: '#e0a830',
+      r: '#eaf6ff', R: '#bfdcf0', u: '#ffe45a', j: '#6ae0ff', J: '#c8f4ff',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#9ad8ff' } },
+    over: { rows: CROWN_ROWS, palette: { g: '#ffe45a' } },
   },
 ];
 
@@ -1320,6 +1692,7 @@ export function createAllTextures(scene: Phaser.Scene) {
   makeTile(scene, 'tile_grass', 'grass');
   makeTile(scene, 'tile_sky', 'sky');
   makeTile(scene, 'tile_dark', 'dark');
+  makeTile(scene, 'tile_void', 'void');
 }
 
 export function createAllAnims(scene: Phaser.Scene) {
@@ -1338,13 +1711,17 @@ export function createAllAnims(scene: Phaser.Scene) {
       repeat,
     });
   };
-  for (const who of ['warrior', 'warrior2', 'warrior3', 'mage', 'mage2', 'mage3']) {
+  for (const who of [
+    'warrior', 'warrior2', 'warrior3', 'warrior4', 'warrior5',
+    'mage', 'mage2', 'mage3', 'mage4', 'mage5',
+  ]) {
     mk(`${who}_stand`, who, [0], 1);
     mk(`${who}_walk`, who, [1, 0, 2, 0], 10);
     mk(`${who}_attack`, who, [3], 1, 0);
   }
-  for (const mob of ['snail', 'mushroom', 'slime', 'pig', 'bat', 'zombieshroom']) {
-    mk(`${mob}_move`, mob, [0, 1], mob === 'bat' ? 8 : 4);
+  // ボスアーキタイプの待機(浮遊・揺れ)アニメ
+  for (const a of ['boss_mush', 'boss_demon', 'boss_drake', 'boss_golem', 'boss_beast', 'boss_lord']) {
+    mk(`${a}_move`, a, [0, 1], 3);
   }
   mk('mushmom_move', 'mushmom', [0, 1], 3);
   mk('pinkbean_move', 'pinkbean', [0, 1], 3);
