@@ -62,7 +62,7 @@ export interface CharDef {
 
 // 転職レベル: 1次=Lv1 / 2次=30 / 3次=60 / 4次=100 / 5次=150
 export const JOB_LEVELS = [1, 30, 60, 100, 150];
-export const LEVEL_CAP = 250;
+export const LEVEL_CAP = 999;
 
 export const CHARACTERS: Record<CharKey, CharDef> = {
   // ========== 戦士: ダークナイト系列(剣士→スピアマン→ドラゴンナイト→ダークナイト) ==========
@@ -277,12 +277,17 @@ export function themeBgm(theme: Theme): 'grass' | 'sky' | 'dark' | 'boss' {
   return theme === 'void' ? 'boss' : theme;
 }
 
+// 推奨レベル(EASY基準): 階層が上がってもなだらかに上昇(急騰を大幅緩和)
+function baseReq(floor: number): number {
+  return Math.max(1, Math.round(1 + Math.pow(floor - 1, 1.15) * 1.3));
+}
+
 export const FLOORS: FloorDef[] = FLOOR_SEEDS.map((s, i) => ({
   floor: i + 1,
   bossKey: s.key,
   bossName: s.name,
   title: s.title,
-  reqLevel: s.req,
+  reqLevel: baseReq(i + 1),
   major: !!s.major,
   theme: themeForFloor(i + 1),
   archetype: s.arch,
@@ -295,25 +300,48 @@ export const GROUND_Y = 432;
 export const WORLD_H = 600;
 export const ARENA_W = 720; // 道場アリーナの横幅(コンパクト)
 
-// ボスのステータス(階層と推奨レベルから算出)
-export function bossHp(f: FloorDef): number {
-  return Math.round(refAtk(f.reqLevel) * (f.major ? 130 : 60));
+// ============================================================
+// 難易度(クリアで次が解放。各段階で敵が強くなる)
+// ============================================================
+export interface DifficultyDef {
+  key: string;
+  name: string;
+  reqMul: number;  // 推奨レベル(=敵ステータス)の倍率
+  expMul: number;  // 経験値ボーナス
+  color: number;
+  desc: string;
 }
-export function bossAtk(f: FloorDef): number {
-  return Math.round(refHp(f.reqLevel) * (f.major ? 0.16 : 0.11));
+export const DIFFICULTIES: DifficultyDef[] = [
+  { key: 'easy',   name: 'EASY',   reqMul: 1.0, expMul: 1.0,  color: 0x4aa84a, desc: 'まずはここから' },
+  { key: 'normal', name: 'NORMAL', reqMul: 1.7, expMul: 1.5,  color: 0x3a7fd6, desc: '敵が手強くなる' },
+  { key: 'hard',   name: 'HARD',   reqMul: 2.8, expMul: 2.3,  color: 0xd8730f, desc: '歴戦の挑戦者へ' },
+  { key: 'oni',    name: '鬼モード', reqMul: 4.4, expMul: 3.6, color: 0xc02a3a, desc: 'Lv150以上で挑め' },
+];
+
+// 階層×難易度の実効推奨レベル(敵の強さの基準)
+export function effReq(f: FloorDef, diff: number): number {
+  return Math.round(f.reqLevel * DIFFICULTIES[diff].reqMul);
 }
-export function bossExp(f: FloorDef): number {
-  return Math.round(expForLevel(f.reqLevel) * (f.major ? 0.55 : 0.32));
+
+// ボスのステータス(実効推奨レベルから算出)
+export function bossHp(f: FloorDef, diff: number): number {
+  return Math.round(refAtk(effReq(f, diff)) * (f.major ? 55 : 32));
+}
+export function bossAtk(f: FloorDef, diff: number): number {
+  return Math.round(refHp(effReq(f, diff)) * (f.major ? 0.11 : 0.08));
+}
+export function bossExp(f: FloorDef, diff: number): number {
+  return Math.round(expForLevel(effReq(f, diff)) * (f.major ? 1.1 : 0.65) * DIFFICULTIES[diff].expMul);
 }
 
 // ============================================================
-// レベル差による命中(MISS)とダメージ補正
+// レベル差による命中(MISS)とダメージ補正(緩め)
 // ============================================================
-// プレイヤー→敵の命中率(推奨レベルに対して低いとMISS頻発)
+// プレイヤー→敵の命中率(実効推奨レベルに対して低いとMISS)
 export function playerHitChance(playerLevel: number, reqLevel: number): number {
   const diff = playerLevel - reqLevel;
   if (diff >= 0) return 1;
-  return Math.max(0.1, 1 + diff * 0.055); // 1レベル不足ごとに-5.5%、下限10%
+  return Math.max(0.2, 1 + diff * 0.04); // 1レベル不足ごとに-4%、下限20%(緩和)
 }
 // レベル不足だと与ダメージも減る(格上補正)
 export function playerDamageScale(playerLevel: number, reqLevel: number): number {
@@ -321,11 +349,11 @@ export function playerDamageScale(playerLevel: number, reqLevel: number): number
   if (diff >= 0) return 1;
   return Math.max(0.25, 1 + diff * 0.04);
 }
-// 敵→プレイヤーの被ダメージ補正(格上ほど痛い)
+// 敵→プレイヤーの被ダメージ補正(格上ほど痛い・緩和)
 export function enemyDamageScale(playerLevel: number, reqLevel: number): number {
   const diff = reqLevel - playerLevel;
   if (diff <= 0) return 1;
-  return 1 + diff * 0.05;
+  return 1 + diff * 0.035;
 }
 
 // ============================================================
@@ -335,6 +363,7 @@ export interface CharState { hp: number; mp: number; }
 
 export interface Progress {
   floor: number;       // 現在の階層(1始まり)
+  difficulty: number;  // 0=EASY 〜 3=鬼
   level: number;
   exp: number;
   charKey: CharKey;
@@ -349,36 +378,55 @@ export interface SaveData {
   level: number;
   exp: number;
   charKey: CharKey;
-  highestFloor: number;  // これまでの到達最高階層
-  clears: number;        // ダンジョン完全制覇回数
+  highestByDiff: number[];   // 難易度別の到達最高階層
+  clearedByDiff: boolean[];  // 難易度別の20階制覇フラグ
+  clears: number;
 }
 
-const SAVE_KEY = 'maple-quest-save-v2';
+const SAVE_KEY = 'maple-quest-save-v3';
+
+function defaultSave(): SaveData {
+  return {
+    level: 1, exp: 0, charKey: 'warrior',
+    highestByDiff: [1, 1, 1, 1],
+    clearedByDiff: [false, false, false, false],
+    clears: 0,
+  };
+}
 
 export function loadSave(): SaveData {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw) {
-      const s = JSON.parse(raw) as SaveData;
+      const s = JSON.parse(raw) as Partial<SaveData>;
+      const d = defaultSave();
       return {
         level: Math.max(1, Math.min(LEVEL_CAP, s.level || 1)),
         exp: Math.max(0, s.exp || 0),
         charKey: s.charKey === 'mage' ? 'mage' : 'warrior',
-        highestFloor: Math.max(1, s.highestFloor || 1),
+        highestByDiff: Array.isArray(s.highestByDiff) ? DIFFICULTIES.map((_, i) => Math.max(1, Math.min(TOTAL_FLOORS, s.highestByDiff![i] || 1))) : d.highestByDiff,
+        clearedByDiff: Array.isArray(s.clearedByDiff) ? DIFFICULTIES.map((_, i) => !!s.clearedByDiff![i]) : d.clearedByDiff,
         clears: s.clears || 0,
       };
     }
   } catch { /* ignore */ }
-  return { level: 1, exp: 0, charKey: 'warrior', highestFloor: 1, clears: 0 };
+  return defaultSave();
 }
 
 export function writeSave(s: SaveData) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
 
-export function newProgress(save: SaveData): Progress {
+// 難易度が解放されているか(EASYは常時、以降は1つ前を制覇で解放)
+export function isDifficultyUnlocked(save: SaveData, diff: number): boolean {
+  if (diff <= 0) return true;
+  return !!save.clearedByDiff[diff - 1];
+}
+
+export function newProgress(save: SaveData, floor = 1, difficulty = 0): Progress {
   return {
-    floor: 1,
+    floor,
+    difficulty,
     level: save.level,
     exp: save.exp,
     charKey: save.charKey,

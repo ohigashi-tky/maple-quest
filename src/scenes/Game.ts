@@ -3,8 +3,8 @@ import {
   CHARACTERS, FLOORS, TOTAL_FLOORS, GROUND_Y, WORLD_H, ARENA_W,
   expForLevel, newProgress, tierFor, tierIndexFor,
   atkScale, hpScale, mpScale, critRate, critMul, fmt, ELIXIR_MAX, LEVEL_CAP,
-  bossHp, bossAtk, bossExp, playerHitChance, playerDamageScale, enemyDamageScale,
-  loadSave, writeSave, themeTile, themeBgm,
+  bossHp, bossAtk, bossExp, playerHitChance, playerDamageScale, enemyDamageScale, effReq,
+  loadSave, writeSave, themeTile, themeBgm, DIFFICULTIES,
   type CharKey, type Progress, type FloorDef, type JobTier, type SkillDef,
 } from '../data';
 import { sfx, playBgm, stopBgm } from '../audio';
@@ -34,11 +34,12 @@ export interface UiState {
   buffLeft: number; buffName: string;
   floor: number; total: number;
   floorName: string;
-  reqLevel: number;
+  difficulty: number;
   underLeveled: boolean;
   boss: { name: string; title: string; hp: number; max: number } | null;
   skills: { name: string; mp: number; cdLeft: number; cd: number }[];
   switchCdLeft: number;
+  elixirCdLeft: number;
   otherCharKey: CharKey;
   gameOver: boolean;
 }
@@ -80,6 +81,7 @@ export default class GameScene extends Phaser.Scene {
   private skillCdAt: number[] = [0, 0, 0];
   private switchCdAt = 0;
   private invulnUntil = 0;
+  private elixirCdUntil = 0;
   private buffs: Record<CharKey, { atk: number; def: number; until: number; name: string }> = {
     warrior: { atk: 1, def: 1, until: 0, name: '' },
     mage: { atk: 1, def: 1, until: 0, name: '' },
@@ -96,20 +98,23 @@ export default class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  init(data: { floor?: number }) {
+  init(data: { floor?: number; difficulty?: number }) {
     this.facing = 1;
     this.attackCdAt = 0;
     this.skillCdAt = [0, 0, 0];
     this.switchCdAt = 0;
     this.invulnUntil = 0;
+    this.elixirCdUntil = 0;
     this.boss = null;
     this.portal = null;
     this.over = false;
     this.transitioning = false;
     this.bossActive = false;
     this._initFloor = data.floor;
+    this._initDiff = data.difficulty;
   }
   private _initFloor?: number;
+  private _initDiff?: number;
 
   create() {
     this.progress = this.registry.get('progress') as Progress;
@@ -118,6 +123,7 @@ export default class GameScene extends Phaser.Scene {
       this.registry.set('progress', this.progress);
     }
     if (this._initFloor !== undefined) this.progress.floor = this._initFloor;
+    if (this._initDiff !== undefined) this.progress.difficulty = this._initDiff;
     this.floorIdx = Phaser.Math.Clamp(this.progress.floor - 1, 0, TOTAL_FLOORS - 1);
     this.floor = FLOORS[this.floorIdx];
 
@@ -135,14 +141,14 @@ export default class GameScene extends Phaser.Scene {
 
     // 階層イントロ → ボス出現
     this.time.delayedCall(200, () => {
-      const lvWarn = this.progress.level < this.floor.reqLevel;
+      const diffName = DIFFICULTIES[this.progress.difficulty].name;
       this.hud()?.showBanner(
-        `第 ${this.floor.floor} 階  ${this.floor.title}「${this.floor.bossName}」`,
+        `第 ${this.floor.floor} 階 [${diffName}]\n${this.floor.title}「${this.floor.bossName}」`,
         this.floor.major ? '#ff7a7a' : '#ffe9b0'
       );
-      if (lvWarn) {
-        this.time.delayedCall(1400, () =>
-          this.hud()?.showBanner(`格上の敵! 推奨Lv.${this.floor.reqLevel}`, '#ff8a8a'));
+      // 格上には数値を出さず注意のみ
+      if (this.progress.level < this.er(this.floor) - 4) {
+        this.time.delayedCall(1500, () => this.hud()?.showBanner('強敵! 油断するな', '#ff8a8a'));
       }
     });
     this.time.delayedCall(1100, () => this.spawnBoss());
@@ -297,11 +303,12 @@ export default class GameScene extends Phaser.Scene {
       buffLeft: 0, buffName: '',
       floor: this.floor.floor, total: TOTAL_FLOORS,
       floorName: `${this.floor.bossName}`,
-      reqLevel: this.floor.reqLevel,
-      underLeveled: this.progress.level < this.floor.reqLevel,
+      difficulty: this.progress.difficulty,
+      underLeveled: this.progress.level < this.er(this.floor),
       boss: null,
       skills: tier.skills.map((s) => ({ name: s.name, mp: this.skillMpCost(s), cdLeft: 0, cd: s.cd })),
       switchCdLeft: 0,
+      elixirCdLeft: 0,
       otherCharKey: def.key === 'warrior' ? 'mage' : 'warrior',
       gameOver: false,
     };
@@ -328,6 +335,8 @@ export default class GameScene extends Phaser.Scene {
     const other: CharKey = this.progress.charKey === 'warrior' ? 'mage' : 'warrior';
     return tierFor(CHARACTERS[other], this.progress.level).spriteKey;
   }
+  // 現在の難易度での実効推奨レベル(敵の強さ基準)
+  private er(f: FloorDef): number { return effReq(f, this.progress.difficulty); }
 
   // ============================================================
   // ボス
@@ -341,8 +350,8 @@ export default class GameScene extends Phaser.Scene {
     const b = this.physics.add.sprite(x, y, `boss_${f.archetype}_0`) as BossSprite;
     b.floor = f;
     b.flying = flying;
-    b.atk = bossAtk(f);
-    b.maxhp = bossHp(f);
+    b.atk = bossAtk(f, this.progress.difficulty);
+    b.maxhp = bossHp(f, this.progress.difficulty);
     b.hp = b.maxhp;
     b.lastHitAt = 0;
     b.aiTimer = 0;
@@ -359,7 +368,7 @@ export default class GameScene extends Phaser.Scene {
     this.boss = b;
     this.bossActive = true;
 
-    this.cameras.main.shake(400, f.major ? 0.006 : 0.004);
+    this.cameras.main.shake(300, f.major ? 0.0035 : 0.0022);
     sfx('thunder');
     if (f.major) this.cameras.main.flash(300, 255, 120, 120);
 
@@ -377,80 +386,204 @@ export default class GameScene extends Phaser.Scene {
     if (b.frozenUntil && this.time.now < b.frozenUntil) return;
     if (b.stunUntil && this.time.now < b.stunUntil) return;
     const arch = b.floor.archetype;
-    const toPlayer = Math.sign(this.player.x - b.x) || 1;
-    const enraged = b.hp < b.maxhp * 0.5;
-
-    if (arch === 'mush' || arch === 'golem') {
-      // 大ジャンプ → 着地衝撃波
-      const body = b.body as Phaser.Physics.Arcade.Body;
-      if (body.blocked.down) body.setVelocity(toPlayer * 120, -320);
-      const land = this.time.addEvent({
-        delay: 60, loop: true,
-        callback: () => {
-          if (!b.active || this.over) { land.remove(); return; }
-          const bd = b.body as Phaser.Physics.Arcade.Body;
-          if (bd.blocked.down && bd.velocity.y >= 0 && land.getOverallProgress() > 0.1) {
-            land.remove();
-            this.cameras.main.shake(240, 0.008);
-            sfx('thunder');
-            this.shockwaveAt(b.x, b.atk, 80 * b.floor.scale);
-          }
-        },
-      });
-    } else if (arch === 'demon' || arch === 'drake') {
-      // 弾幕(扇状)
-      const n = enraged ? 5 : 3;
-      const base = Math.atan2(this.player.y - b.y, this.player.x - b.x);
-      const tex = arch === 'demon' ? 'fx_fire_0' : 'fx_orb_0';
-      for (let i = 0; i < n; i++) {
-        const ang = base + (i - (n - 1) / 2) * 0.26;
-        const shot = this.enemyShots.create(b.x, b.y, tex) as Phaser.Physics.Arcade.Sprite;
-        shot.setVelocity(Math.cos(ang) * 110, Math.sin(ang) * 110);
-        shot.setTint(b.floor.tint);
-        shot.setDepth(9);
-        (shot.body as Phaser.Physics.Arcade.Body).setCircle(4);
-        this.time.delayedCall(3500, () => shot.active && shot.destroy());
-      }
-      sfx('fire');
-      if (!b.flying && (b.body as Phaser.Physics.Arcade.Body).blocked.down) b.setVelocity(toPlayer * 100, -240);
-    } else if (arch === 'beast') {
-      // 急襲ダッシュ
-      const body = b.body as Phaser.Physics.Arcade.Body;
-      body.setVelocity(toPlayer * 260, -60);
-      this.time.delayedCall(500, () => b.active && body.setVelocityX(toPlayer * 60));
-    } else {
-      // lord: 落雷 or オーブ弾幕
-      if (Math.random() < 0.5) {
-        const targets = enraged ? [this.player.x, this.player.x + Phaser.Math.Between(-60, 60)] : [this.player.x];
-        for (const tx of targets) {
-          const warn = this.add.rectangle(tx, GROUND_Y - 60, 22, 120, b.floor.tint, 0.25).setDepth(7);
-          this.tweens.add({ targets: warn, alpha: 0.5, duration: 120, yoyo: true, repeat: 3 });
-          this.time.delayedCall(720, () => {
-            warn.destroy();
-            if (this.over) return;
-            const bolt = this.add.image(tx, GROUND_Y - 50, 'fx_bolt_0').setDepth(12).setScale(1.4, 4).setTint(b.floor.tint);
-            sfx('thunder');
-            this.cameras.main.shake(150, 0.006);
-            this.tweens.add({ targets: bolt, alpha: 0, duration: 300, onComplete: () => bolt.destroy() });
-            if (Math.abs(this.player.x - tx) < 18 && this.player.y > GROUND_Y - 130) this.hurtPlayer(b.atk * 1.1);
-          });
-        }
-      } else {
-        const n = enraged ? 6 : 4;
-        for (let i = 0; i < n; i++) {
-          this.time.delayedCall(i * 120, () => {
-            if (!b.active || this.over) return;
-            const ang = Math.atan2(this.player.y - b.y, this.player.x - b.x) + Phaser.Math.FloatBetween(-0.3, 0.3);
-            const shot = this.enemyShots.create(b.x, b.y, 'fx_orb_0') as Phaser.Physics.Arcade.Sprite;
-            shot.setVelocity(Math.cos(ang) * 130, Math.sin(ang) * 130);
-            shot.setTint(b.floor.tint);
-            shot.setDepth(9);
-            this.time.delayedCall(3200, () => shot.active && shot.destroy());
-            sfx('claw');
-          });
-        }
-      }
+    // アーキタイプごとの攻撃プール(複数からランダム選択)
+    const pools: Record<string, string[]> = {
+      mush: ['slam', 'ring', 'rain'],
+      golem: ['slam', 'spikes', 'rain'],
+      demon: ['fan', 'homing', 'ring'],
+      drake: ['fan', 'rain', 'beam'],
+      beast: ['dash', 'fan', 'spikes'],
+      lord: ['bolt', 'orbBurst', 'beam', 'homing', 'rain'],
+    };
+    const pool = pools[arch] ?? ['fan'];
+    const pick = pool[Phaser.Math.Between(0, pool.length - 1)];
+    switch (pick) {
+      case 'slam': this.atkSlam(b); break;
+      case 'fan': this.atkFan(b, arch === 'demon' ? 'fx_fire_0' : 'fx_orb_0'); break;
+      case 'dash': this.atkDash(b); break;
+      case 'bolt': this.atkBolt(b); break;
+      case 'ring': this.atkRing(b); break;
+      case 'orbBurst': this.atkOrbBurst(b); break;
+      case 'rain': this.atkRain(b); break;
+      case 'spikes': this.atkSpikes(b); break;
+      case 'homing': this.atkHoming(b); break;
+      case 'beam': this.atkBeam(b); break;
     }
+  }
+
+  // 敵弾を生成
+  private eShot(b: BossSprite, x: number, y: number, tex: string, vx: number, vy: number, scale = 1, life = 3500) {
+    const s = this.enemyShots.create(x, y, tex) as Phaser.Physics.Arcade.Sprite;
+    s.setVelocity(vx, vy).setTint(b.floor.tint).setDepth(9).setScale(scale);
+    (s.body as Phaser.Physics.Arcade.Body).setCircle(4);
+    if (vx !== 0 || vy !== 0) s.setRotation(Math.atan2(vy, vx));
+    this.time.delayedCall(life, () => s.active && s.destroy());
+    return s;
+  }
+
+  // 大ジャンプ → 着地衝撃波
+  private atkSlam(b: BossSprite) {
+    const toPlayer = Math.sign(this.player.x - b.x) || 1;
+    const body = b.body as Phaser.Physics.Arcade.Body;
+    if (b.flying || body.blocked.down) body.setVelocity(toPlayer * 130, -340);
+    const land = this.time.addEvent({
+      delay: 60, loop: true,
+      callback: () => {
+        if (!b.active || this.over) { land.remove(); return; }
+        const bd = b.body as Phaser.Physics.Arcade.Body;
+        if (bd.blocked.down && bd.velocity.y >= 0 && land.getOverallProgress() > 0.1) {
+          land.remove();
+          this.cameras.main.shake(180, 0.0035);
+          sfx('thunder');
+          this.shockwaveAt(b.x, b.atk, 84 * b.floor.scale);
+        }
+      },
+    });
+  }
+
+  // 扇状弾幕
+  private atkFan(b: BossSprite, tex: string) {
+    const enraged = b.hp < b.maxhp * 0.5;
+    const n = enraged ? 5 : 3;
+    const base = Math.atan2(this.player.y - b.y, this.player.x - b.x);
+    for (let i = 0; i < n; i++) {
+      const ang = base + (i - (n - 1) / 2) * 0.26;
+      this.eShot(b, b.x, b.y, tex, Math.cos(ang) * 120, Math.sin(ang) * 120);
+    }
+    sfx('fire');
+    if (!b.flying && (b.body as Phaser.Physics.Arcade.Body).blocked.down) b.setVelocity((Math.sign(this.player.x - b.x) || 1) * 100, -220);
+  }
+
+  // 全方位リング弾
+  private atkRing(b: BossSprite) {
+    const enraged = b.hp < b.maxhp * 0.5;
+    const n = enraged ? 14 : 10;
+    const off = Math.random() * Math.PI;
+    for (let i = 0; i < n; i++) {
+      const ang = off + (i / n) * Math.PI * 2;
+      this.eShot(b, b.x, b.y, 'fx_orb_0', Math.cos(ang) * 95, Math.sin(ang) * 95);
+    }
+    const ring = this.add.circle(b.x, b.y, 6, b.floor.tint, 0.5).setDepth(8);
+    this.tweens.add({ targets: ring, radius: 40, alpha: 0, duration: 350, onUpdate: () => ring.setRadius(ring.radius), onComplete: () => ring.destroy() });
+    sfx('fire');
+  }
+
+  // 連続オーブ(プレイヤー狙い)
+  private atkOrbBurst(b: BossSprite) {
+    const enraged = b.hp < b.maxhp * 0.5;
+    const n = enraged ? 6 : 4;
+    for (let i = 0; i < n; i++) {
+      this.time.delayedCall(i * 130, () => {
+        if (!b.active || this.over) return;
+        const ang = Math.atan2(this.player.y - b.y, this.player.x - b.x) + Phaser.Math.FloatBetween(-0.25, 0.25);
+        this.eShot(b, b.x, b.y, 'fx_orb_0', Math.cos(ang) * 135, Math.sin(ang) * 135);
+        sfx('claw');
+      });
+    }
+  }
+
+  // 急襲ダッシュ
+  private atkDash(b: BossSprite) {
+    const toPlayer = Math.sign(this.player.x - b.x) || 1;
+    const body = b.body as Phaser.Physics.Arcade.Body;
+    // 予兆(目を光らせる)
+    b.setTintFill(0xffffff);
+    this.time.delayedCall(180, () => { if (b.active) b.setTint(b.floor.tint); body.setVelocity(toPlayer * 300, b.flying ? 0 : -70); });
+    this.time.delayedCall(640, () => b.active && body.setVelocityX(toPlayer * 60));
+  }
+
+  // 落雷(予兆 → 直撃)
+  private atkBolt(b: BossSprite) {
+    const enraged = b.hp < b.maxhp * 0.5;
+    const targets = enraged ? [this.player.x, this.player.x + Phaser.Math.Between(-70, 70), this.player.x + Phaser.Math.Between(-70, 70)] : [this.player.x, this.player.x + Phaser.Math.Between(-50, 50)];
+    targets.forEach((tx, i) => {
+      this.time.delayedCall(i * 120, () => {
+        const warn = this.add.rectangle(tx, GROUND_Y - 60, 20, 120, b.floor.tint, 0.22).setDepth(7);
+        this.tweens.add({ targets: warn, alpha: 0.5, duration: 110, yoyo: true, repeat: 3 });
+        this.time.delayedCall(640, () => {
+          warn.destroy();
+          if (this.over) return;
+          const bolt = this.add.image(tx, GROUND_Y - 50, 'fx_bolt_0').setDepth(12).setScale(1.4, 4).setTint(b.floor.tint);
+          sfx('thunder');
+          this.cameras.main.shake(110, 0.003);
+          this.tweens.add({ targets: bolt, alpha: 0, duration: 300, onComplete: () => bolt.destroy() });
+          if (Math.abs(this.player.x - tx) < 18 && this.player.y > GROUND_Y - 130) this.hurtPlayer(b.atk * 1.05);
+        });
+      });
+    });
+  }
+
+  // 天から降る弾(エリアに雨)
+  private atkRain(b: BossSprite) {
+    const enraged = b.hp < b.maxhp * 0.5;
+    const n = enraged ? 8 : 5;
+    const cx = this.player.x;
+    for (let i = 0; i < n; i++) {
+      this.time.delayedCall(i * 90, () => {
+        if (!b.active || this.over) return;
+        const tx = cx + Phaser.Math.Between(-90, 90);
+        this.eShot(b, tx, -10, b.floor.archetype === 'drake' ? 'fx_ice_0' : 'fx_fire_0', Phaser.Math.Between(-20, 20), 200, 1, 3000);
+        sfx('fire');
+      });
+    }
+  }
+
+  // 地面から噴き出す棘(予兆あり・プレイヤー付近)
+  private atkSpikes(b: BossSprite) {
+    const enraged = b.hp < b.maxhp * 0.5;
+    const n = enraged ? 5 : 3;
+    let sx = this.player.x - (n * 22) / 2;
+    for (let i = 0; i < n; i++) {
+      const x = sx + i * 26 + Phaser.Math.Between(-4, 4);
+      this.time.delayedCall(i * 110, () => {
+        if (this.over) return;
+        const warn = this.add.circle(x, GROUND_Y - 2, 10, b.floor.tint, 0.3).setDepth(7);
+        this.tweens.add({ targets: warn, alpha: 0.6, duration: 100, yoyo: true, repeat: 2 });
+        this.time.delayedCall(420, () => {
+          warn.destroy();
+          if (this.over) return;
+          const spike = this.add.triangle(x, GROUND_Y, 0, 0, -10, 30, 10, 30, b.floor.tint).setDepth(11).setAlpha(0.95).setOrigin(0.5, 1);
+          spike.setScale(1, 0);
+          this.tweens.add({ targets: spike, scaleY: 1.6, duration: 120, yoyo: true, hold: 120, onComplete: () => spike.destroy() });
+          sfx('hit');
+          if (Math.abs(this.player.x - x) < 20 && this.player.y > GROUND_Y - 60) this.hurtPlayer(b.atk * 0.9);
+        });
+      });
+    }
+  }
+
+  // 追尾オーブ(ゆっくり追う)
+  private atkHoming(b: BossSprite) {
+    const enraged = b.hp < b.maxhp * 0.5;
+    const n = enraged ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      this.time.delayedCall(i * 200, () => {
+        if (!b.active || this.over) return;
+        const s = this.eShot(b, b.x, b.y, 'fx_orb_0', 0, 0, 1.1, 4000) as Phaser.Physics.Arcade.Sprite & { homing?: boolean };
+        s.homing = true;
+        sfx('claw');
+      });
+    }
+  }
+
+  // 横薙ぎビーム(予兆 → 発射)
+  private atkBeam(b: BossSprite) {
+    const dir = Math.sign(this.player.x - b.x) || 1;
+    const y = b.y;
+    const warn = this.add.rectangle(b.x + dir * 160, y, 320, 6, b.floor.tint, 0.25).setDepth(7).setOrigin(dir > 0 ? 0 : 1, 0.5);
+    warn.setX(b.x);
+    this.tweens.add({ targets: warn, alpha: 0.55, duration: 130, yoyo: true, repeat: 2 });
+    this.time.delayedCall(560, () => {
+      warn.destroy();
+      if (this.over || !b.active) return;
+      sfx('thunder');
+      this.cameras.main.shake(120, 0.003);
+      const beam = this.add.rectangle(b.x, y, 360, 16, b.floor.tint, 0.9).setDepth(12).setOrigin(dir > 0 ? 0 : 1, 0.5);
+      this.tweens.add({ targets: beam, alpha: 0, scaleY: 2, duration: 280, onComplete: () => beam.destroy() });
+      // ビームライン上にいれば被弾
+      const onLine = Math.abs(this.player.y - y) < 18 && (dir > 0 ? this.player.x > b.x : this.player.x < b.x) && Math.abs(this.player.x - b.x) < 360;
+      if (onLine) this.hurtPlayer(b.atk * 1.1);
+    });
   }
 
   private shockwaveAt(x: number, atk: number, radius: number) {
@@ -533,14 +666,29 @@ export default class GameScene extends Phaser.Scene {
     sfx('slash');
     const power = s.hits >= 5;
     this.meleeFx(1.2 + s.hits * 0.12);
+    // 多段ぶんの槍/剣閃が前方へ連続して走る独創エフェクト
+    const range = s.range ?? 36;
+    for (let k = 0; k < s.hits; k++) {
+      this.time.delayedCall(k * 55, () => {
+        if (this.over) return;
+        const off = 10 + (k / Math.max(1, s.hits - 1)) * (range * 0.9);
+        const yj = Phaser.Math.Between(-10, 10);
+        const tint = power ? 0xc89aff : 0xffe9b0;
+        const blade = this.add.rectangle(this.player.x + this.facing * off, this.player.y - 2 + yj, 26, 4, tint, 0.95)
+          .setDepth(12).setOrigin(this.facing > 0 ? 0 : 1, 0.5);
+        this.tweens.add({ targets: blade, scaleX: 1.8, alpha: 0, x: blade.x + this.facing * 16, duration: 200, onComplete: () => blade.destroy() });
+        const tip = this.add.image(this.player.x + this.facing * (off + 18), this.player.y - 2 + yj, 'fx_star_0').setDepth(13).setScale(0.8).setTint(tint);
+        this.tweens.add({ targets: tip, scale: 0.2, alpha: 0, duration: 180, onComplete: () => tip.destroy() });
+      });
+    }
     if (power) {
       const arc = this.add.sprite(this.player.x + this.facing * 22, this.player.y - 2, 'fx_slash_0')
-        .setDepth(12).setFlipX(this.facing < 0).setScale(2.4).setTint(0xb89aff).setAlpha(0.85);
+        .setDepth(12).setFlipX(this.facing < 0).setScale(2.6).setTint(0xb89aff).setAlpha(0.85);
       arc.play('fx_slash_play');
       arc.once('animationcomplete', () => arc.destroy());
-      this.cameras.main.shake(90, 0.003);
+      this.cameras.main.shake(70, 0.0025);
     }
-    this.meleeHit(s.range ?? 36, s.mult, s.hits);
+    this.meleeHit(range, s.mult, s.hits);
   }
 
   private skAoe(s: SkillDef) {
@@ -697,7 +845,7 @@ export default class GameScene extends Phaser.Scene {
 
   private skMeteor(s: SkillDef) {
     sfx('fire');
-    this.cameras.main.shake(220, 0.006);
+    this.cameras.main.shake(130, 0.0035);
     const isIce = s.name.includes('ブリザード');
     const b = this.boss;
     const spots: { x: number; y: number }[] = [];
@@ -730,9 +878,15 @@ export default class GameScene extends Phaser.Scene {
     sfx('thunder');
     sfx('levelup');
     this.cameras.main.flash(400, 255, 240, 200);
-    this.cameras.main.shake(360, 0.006);
+    this.cameras.main.shake(200, 0.0035);
     const cam = this.cameras.main;
     const left = cam.scrollX, right = cam.scrollX + cam.width / cam.zoom;
+    // 自分から放射状に走る光線(独創的なバースト)
+    for (let a = 0; a < 12; a++) {
+      const ang = (a / 12) * Math.PI * 2;
+      const ray = this.add.rectangle(this.player.x, this.player.y, 60, 4, 0xffffff, 0.8).setDepth(13).setOrigin(0, 0.5).setRotation(ang);
+      this.tweens.add({ targets: ray, scaleX: 2.4, alpha: 0, duration: 320, onComplete: () => ray.destroy() });
+    }
     for (let k = 0; k < 12; k++) {
       const x = Phaser.Math.Between(Math.floor(left), Math.floor(right));
       this.time.delayedCall(k * 40, () => {
@@ -802,8 +956,10 @@ export default class GameScene extends Phaser.Scene {
 
   useElixir() {
     if (this.over || this.transitioning) return;
+    if (this.time.now < this.elixirCdUntil) { sfx('denied'); return; }
     if (this.progress.elixirs <= 0) { sfx('denied'); return; }
     this.progress.elixirs--;
+    this.elixirCdUntil = this.time.now + 6000; // クールタイム6秒
     sfx('potion');
     this.charState.hp = this.maxHp(this.progress.charKey);
     this.charState.mp = this.maxMp(this.progress.charKey);
@@ -894,8 +1050,8 @@ export default class GameScene extends Phaser.Scene {
   // 多段ヒット + MISS判定 + レベル差補正
   private hitEnemy(e: BossSprite, mult: number, hits: number) {
     if (!e.active || e.dying) return;
-    const hitChance = playerHitChance(this.progress.level, e.floor.reqLevel);
-    const dmgScale = playerDamageScale(this.progress.level, e.floor.reqLevel);
+    const hitChance = playerHitChance(this.progress.level, this.er(e.floor));
+    const dmgScale = playerDamageScale(this.progress.level, this.er(e.floor));
     for (let i = 0; i < Math.max(1, hits); i++) {
       this.time.delayedCall(i * 75, () => {
         if (!e.active || e.dying) return;
@@ -958,9 +1114,9 @@ export default class GameScene extends Phaser.Scene {
     (e.body as Phaser.Physics.Arcade.Body).enable = false;
     this.bossActive = false;
     sfx('bossdie');
-    this.gainExp(bossExp(e.floor));
+    this.gainExp(bossExp(e.floor, this.progress.difficulty));
     this.boss = null;
-    this.cameras.main.shake(500, 0.006);
+    this.cameras.main.shake(320, 0.004);
     this.cameras.main.flash(400, 255, 255, 255);
     this.tweens.add({
       targets: e, alpha: 0, y: e.y - 14, scaleX: e.scaleX * 1.1, scaleY: e.scaleY * 1.1, duration: 900,
@@ -1009,11 +1165,17 @@ export default class GameScene extends Phaser.Scene {
     stopBgm();
     this.over = true;
     const save = loadSave();
+    save.level = this.progress.level;
+    save.exp = this.progress.exp;
+    save.charKey = this.progress.charKey;
     save.clears = (save.clears || 0) + 1;
-    save.highestFloor = TOTAL_FLOORS;
+    const d = this.progress.difficulty;
+    save.highestByDiff[d] = TOTAL_FLOORS;
+    save.clearedByDiff[d] = true; // 次の難易度を解放
     writeSave(save);
     const time = Math.floor((Date.now() - this.progress.startTime) / 1000);
-    this.hud()?.showClear({ level: this.progress.level, floor: TOTAL_FLOORS, time });
+    const unlocked = d + 1 < DIFFICULTIES.length ? DIFFICULTIES[d + 1].name : null;
+    this.hud()?.showClear({ level: this.progress.level, time, difficulty: DIFFICULTIES[d].name, unlockedNext: unlocked });
   }
 
   // ============================================================
@@ -1026,13 +1188,13 @@ export default class GameScene extends Phaser.Scene {
     this.invulnUntil = now + 900;
     const buff = this.buffs[this.progress.charKey];
     const defMul = now < buff.until ? buff.def : 1;
-    const lvMul = enemyDamageScale(this.progress.level, this.floor.reqLevel);
+    const lvMul = enemyDamageScale(this.progress.level, this.er(this.floor));
     const dmg = Math.max(1, Math.floor(rawAtk * Phaser.Math.FloatBetween(0.85, 1.15) * defMul * lvMul));
     this.charState.hp = Math.max(0, this.charState.hp - dmg);
     sfx('hurt');
     this.floatText(this.player.x, this.player.y - 28, fmt(dmg), '#ff5a5a');
     this.player.setTintFill(0xff6a6a);
-    this.cameras.main.shake(100, 0.004);
+    this.cameras.main.shake(70, 0.0022);
     this.player.setVelocityY(-110);
     this.time.delayedCall(120, () => this.player.clearTint());
     this.tweens.add({ targets: this.player, alpha: 0.35, duration: 100, yoyo: true, repeat: 4, onComplete: () => this.player.setAlpha(1) });
@@ -1055,20 +1217,23 @@ export default class GameScene extends Phaser.Scene {
     stopBgm();
     sfx('die');
     this.physics.pause();
+    this.persist(this.progress.floor);
     this.tweens.add({ targets: this.player, angle: 90, alpha: 0.6, y: this.player.y - 10, duration: 600 });
-    this.hud()?.showGameOver(this.floor.floor, () => this.retryFromFloor1());
+    this.hud()?.showGameOver(this.floor.floor, this.progress.difficulty,
+      () => this.retryFloor(1, this.progress.difficulty),
+      (floor: number, diff: number) => this.retryFloor(floor, diff));
   }
 
-  private retryFromFloor1() {
-    // レベルは保持したまま1階から再挑戦
-    this.persist(this.progress.floor);
+  // 指定の階層・難易度から再挑戦(レベルは保持)
+  retryFloor(floor: number, difficulty: number) {
     for (const k of ['warrior', 'mage'] as CharKey[]) {
       this.progress.chars[k].hp = this.maxHp(k);
       this.progress.chars[k].mp = this.maxMp(k);
     }
     this.progress.elixirs = Math.max(this.progress.elixirs, 8);
-    this.progress.floor = 1;
-    this.scene.restart({ floor: 1 });
+    this.progress.floor = floor;
+    this.progress.difficulty = difficulty;
+    this.scene.restart({ floor, difficulty });
   }
 
   private gainExp(exp: number) {
@@ -1115,14 +1280,17 @@ export default class GameScene extends Phaser.Scene {
     this.buildUiState();
   }
 
-  private persist(floor: number) {
-    writeSave({
-      level: this.progress.level,
-      exp: this.progress.exp,
-      charKey: this.progress.charKey,
-      highestFloor: Math.max(loadSave().highestFloor, floor),
-      clears: loadSave().clears,
-    });
+  // レベル/経験値を保存しつつ、現難易度の到達階層も更新
+  private persist(reachedFloor?: number) {
+    const save = loadSave();
+    save.level = this.progress.level;
+    save.exp = this.progress.exp;
+    save.charKey = this.progress.charKey;
+    const d = this.progress.difficulty;
+    if (reachedFloor !== undefined) {
+      save.highestByDiff[d] = Math.max(save.highestByDiff[d] || 1, Math.min(TOTAL_FLOORS, reachedFloor));
+    }
+    writeSave(save);
   }
 
   private floatText(x: number, y: number, msg: string, color: string) {
@@ -1262,9 +1430,19 @@ export default class GameScene extends Phaser.Scene {
         if (!shot.pierce) shot.destroy();
       }
     }
-    for (const shot of this.enemyShots.getChildren() as Phaser.Physics.Arcade.Sprite[]) {
+    for (const shot of this.enemyShots.getChildren() as (Phaser.Physics.Arcade.Sprite & { homing?: boolean })[]) {
       if (!shot.active) continue;
       if (shot.x < -30 || shot.x > ARENA_W + 30 || shot.y < -30 || shot.y > WORLD_H + 30) { shot.destroy(); continue; }
+      // 追尾弾は徐々にプレイヤーへ向きを変える
+      if (shot.homing) {
+        const body = shot.body as Phaser.Physics.Arcade.Body;
+        const ang = Math.atan2(this.player.y - shot.y, this.player.x - shot.x);
+        const cur = Math.atan2(body.velocity.y, body.velocity.x);
+        const spd = 100;
+        const na = cur + Phaser.Math.Angle.Wrap(ang - cur) * 0.06;
+        body.setVelocity(Math.cos(na) * spd, Math.sin(na) * spd);
+        shot.setRotation(na);
+      }
       if (Math.abs(shot.x - this.player.x) < 11 && Math.abs(shot.y - this.player.y) < 15) {
         const atk = this.boss ? this.boss.atk * 0.7 : 20;
         shot.destroy();
@@ -1315,8 +1493,9 @@ export default class GameScene extends Phaser.Scene {
     ui.floor = this.floor.floor;
     ui.total = TOTAL_FLOORS;
     ui.floorName = this.floor.bossName;
-    ui.reqLevel = this.floor.reqLevel;
-    ui.underLeveled = this.progress.level < this.floor.reqLevel;
+    ui.difficulty = this.progress.difficulty;
+    ui.underLeveled = this.progress.level < this.er(this.floor);
+    ui.elixirCdLeft = Math.max(0, this.elixirCdUntil - now);
     ui.boss = this.boss && this.boss.active
       ? { name: this.boss.floor.bossName, title: this.boss.floor.title, hp: Math.max(0, this.boss.hp), max: this.boss.maxhp }
       : null;

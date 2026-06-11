@@ -2,8 +2,12 @@ import Phaser from 'phaser';
 import { VIEW_W, VIEW_H } from '../main';
 import { initAudio, playBgm, sfx } from '../audio';
 import { loadSave, writeSave, newProgress, CHARACTERS, tierFor, type CharKey } from '../data';
+import { openFloorSelect } from '../ui/FloorSelect';
 
 export default class TitleScene extends Phaser.Scene {
+  private selectedClass: CharKey = 'warrior';
+  private classBtns: { key: CharKey; redraw: () => void }[] = [];
+
   constructor() {
     super('Title');
   }
@@ -60,30 +64,67 @@ export default class TitleScene extends Phaser.Scene {
     pg.fillRoundedRect(cx - 200, panelY - 36, 400, 96, 16);
     pg.lineStyle(2, 0xffb347, 0.8);
     pg.strokeRoundedRect(cx - 200, panelY - 36, 400, 96, 16);
-    const wTier = tierFor(CHARACTERS.warrior, save.level);
-    const mTier = tierFor(CHARACTERS.mage, save.level);
-    const jobName = save.charKey === 'warrior' ? wTier.jobName : mTier.jobName;
-    this.add.text(cx, panelY - 12, `Lv.${save.level}  ${jobName}`, {
+    const maxFloor = Math.max(...save.highestByDiff);
+    this.selectedClass = save.charKey;
+    const jobName = tierFor(CHARACTERS[this.selectedClass], save.level).jobName;
+    const lvText = this.add.text(cx, panelY - 12, `Lv.${save.level}  ${jobName}`, {
       fontFamily: '"Arial Black", sans-serif', fontSize: '26px', color: '#ffe9b0',
     }).setOrigin(0.5).setResolution(2);
-    this.add.text(cx, panelY + 28, save.highestFloor > 1
-      ? `最高到達: 第 ${save.highestFloor} 階 ${save.clears > 0 ? `(制覇 ${save.clears} 回)` : ''}`
+    this.add.text(cx, panelY + 28, maxFloor > 1
+      ? `最高到達: 第 ${maxFloor} 階 ${save.clears > 0 ? `(制覇 ${save.clears} 回)` : ''}`
       : 'はじめての挑戦', {
       fontFamily: 'sans-serif', fontSize: '18px', color: '#cfe0ff',
     }).setOrigin(0.5).setResolution(2);
 
-    // クラス選択 → 挑戦開始
-    this.add.text(cx, VIEW_H - 470, '挑戦するジョブを選べ', {
-      fontFamily: 'sans-serif', fontSize: '20px', fontStyle: 'bold', color: '#ffffff', stroke: '#4a2a5a', strokeThickness: 5,
+    // ジョブ選択トグル(戦士が既定)
+    this.add.text(cx, VIEW_H - 488, 'ジョブ', {
+      fontFamily: 'sans-serif', fontSize: '16px', fontStyle: 'bold', color: '#ffffff', stroke: '#4a2a5a', strokeThickness: 4,
     }).setOrigin(0.5).setResolution(2);
-    this.makeButton(cx, VIEW_H - 410, '戦士で挑戦', '剣士→ダークナイト', 0xc85a3a, () => this.start('warrior'));
-    this.makeButton(cx, VIEW_H - 318, '魔法使いで挑戦', '魔法使い→アークメイジ(氷雷)', 0x3a6ad8, () => this.start('mage'));
+    this.classBtns = [];
+    const onClass = (k: CharKey) => {
+      this.selectedClass = k;
+      lvText.setText(`Lv.${save.level}  ${tierFor(CHARACTERS[k], save.level).jobName}`);
+      this.classBtns.forEach((b) => b.redraw());
+    };
+    this.makeClassToggle(cx - 96, VIEW_H - 440, 'warrior', '戦士', 'ダークナイト系', 0xc85a3a, onClass);
+    this.makeClassToggle(cx + 96, VIEW_H - 440, 'mage', '魔法使い', 'アークメイジ系', 0x3a6ad8, onClass);
 
-    this.add.text(cx, VIEW_H - 14, 'レベルは記憶され、自分の強さで何階まで登れるか挑戦!', {
-      fontFamily: 'sans-serif', fontSize: '15px', color: '#5a4a3a',
+    // 挑戦(1階 EASY から)
+    this.makeButton(cx, VIEW_H - 350, '挑 戦', '第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
+    // 階層をえらぶ(難易度・到達階層から)
+    this.makeButton(cx, VIEW_H - 262, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
+      initAudio();
+      openFloorSelect(this, loadSave(), 0, (f, d) => this.start(f, d));
+    });
+
+    this.add.text(cx, VIEW_H - 14, 'レベルは記憶され(最大Lv999)、自分の強さで何階まで登れるか挑戦!', {
+      fontFamily: 'sans-serif', fontSize: '14px', color: '#5a4a3a',
     }).setOrigin(0.5, 1);
 
     this.input.once('pointerdown', () => { initAudio(); playBgm('title'); });
+  }
+
+  private makeClassToggle(x: number, y: number, key: CharKey, label: string, sub: string, color: number, onTap: (k: CharKey) => void) {
+    const w = 176, h = 66;
+    const c = this.add.container(x, y);
+    const g = this.add.graphics();
+    const spr = this.add.sprite(-w / 2 + 24, 0, `${key}_0`).setScale(2.4);
+    const t = this.add.text(8, -12, label, { fontFamily: 'sans-serif', fontSize: '20px', fontStyle: 'bold', color: '#ffffff', stroke: '#2a1a30', strokeThickness: 3 }).setOrigin(0.5).setResolution(2);
+    const st = this.add.text(8, 14, sub, { fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe9d0' }).setOrigin(0.5).setResolution(2);
+    c.add([g, spr, t, st]);
+    c.setSize(w, h).setInteractive({ useHandCursor: true });
+    const redraw = () => {
+      const active = this.selectedClass === key;
+      g.clear();
+      const col = Phaser.Display.Color.IntegerToColor(color);
+      g.fillStyle(col.clone().darken(active ? 0 : 45).color, active ? 1 : 0.7);
+      g.fillRoundedRect(-w / 2, -h / 2, w, h, 14);
+      if (active) { g.lineStyle(3, 0xffffff, 0.95); g.strokeRoundedRect(-w / 2, -h / 2, w, h, 14); }
+    };
+    c.on('pointerdown', () => { initAudio(); sfx('select'); onTap(key); });
+    redraw();
+    this.classBtns.push({ key, redraw });
+    return c;
   }
 
   private makeButton(x: number, y: number, label: string, sub: string, color: number, onTap: () => void) {
@@ -114,14 +155,14 @@ export default class TitleScene extends Phaser.Scene {
     return c;
   }
 
-  private start(charKey: CharKey) {
+  private start(floor: number, difficulty: number) {
     const save = loadSave();
-    save.charKey = charKey;
+    save.charKey = this.selectedClass;
     writeSave(save);
-    this.registry.set('progress', newProgress(save));
+    this.registry.set('progress', newProgress(save, floor, difficulty));
     this.cameras.main.fadeOut(350, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
-      this.scene.start('Game', { floor: 1 });
+      this.scene.start('Game', { floor, difficulty });
       this.scene.launch('Hud');
     });
   }

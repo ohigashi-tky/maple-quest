@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { VIEW_W, VIEW_H } from '../main';
-import { sfx, setMuted, isMuted, stopBgm, playBgm } from '../audio';
-import { fmt } from '../data';
+import { sfx, setMuted, isMuted, stopBgm } from '../audio';
+import { fmt, DIFFICULTIES, loadSave } from '../data';
+import { openFloorSelect } from '../ui/FloorSelect';
 import type GameScene from './Game';
 
 interface BtnOpts {
@@ -395,52 +396,58 @@ export default class HudScene extends Phaser.Scene {
     });
   }
 
-  showGameOver(floor: number, onRetry: () => void) {
+  showGameOver(floor: number, difficulty: number, onRetry1: () => void, onPickFloor: (floor: number, diff: number) => void) {
     this.clearOverlay();
     const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(100);
     const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x000000, 0.72).setInteractive();
-    const title = this.add.text(VIEW_W / 2, cy - 180, 'GAME OVER', {
-      fontFamily: '"Arial Black", sans-serif', fontSize: '56px',
+    const title = this.add.text(VIEW_W / 2, cy - 200, 'GAME OVER', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '54px',
       color: '#ff5a5a', stroke: '#3d0a0a', strokeThickness: 10,
     }).setOrigin(0.5).setResolution(2);
-    const subtitle = this.add.text(VIEW_W / 2, cy - 110, `第 ${floor} 階で力尽きた…`, {
+    const subtitle = this.add.text(VIEW_W / 2, cy - 132, `第 ${floor} 階で力尽きた…`, {
       fontFamily: 'sans-serif', fontSize: '24px', color: '#ffd8d8',
     }).setOrigin(0.5).setResolution(2);
-    const hint = this.add.text(VIEW_W / 2, cy - 60, 'レベルは引き継がれる。\n鍛えて再挑戦しよう!', {
-      fontFamily: 'sans-serif', fontSize: '18px', color: '#cfe0ff', align: 'center', lineSpacing: 6,
+    const hint = this.add.text(VIEW_W / 2, cy - 86, 'レベルは引き継がれる。鍛えて再挑戦!', {
+      fontFamily: 'sans-serif', fontSize: '16px', color: '#cfe0ff',
     }).setOrigin(0.5).setResolution(2);
     c.add([dim, title, subtitle, hint]);
-    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 30, '1階から再挑戦', 0xff8a2a, () => {
-      this.clearOverlay();
-      onRetry();
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy - 24, '1階から再挑戦', 0xff8a2a, () => { this.clearOverlay(); onRetry1(); }));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 64, '階層をえらぶ', 0x8a5ac4, () => {
+      openFloorSelect(this, loadSave(), difficulty, (f, d) => { this.clearOverlay(); onPickFloor(f, d); });
     }));
-    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 130, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 152, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
     this.overlay = c;
   }
 
-  showClear(stats: { level: number; floor: number; time: number }) {
+  showClear(stats: { level: number; time: number; difficulty: string; unlockedNext: string | null }) {
     this.clearOverlay();
     sfx('levelup');
     const cy = VIEW_H / 2;
     const c = this.add.container(0, 0).setDepth(100);
     const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x0a0a20, 0.82).setInteractive();
-    const title = this.add.text(VIEW_W / 2, cy - 210, '全 20 階 制覇!', {
+    const title = this.add.text(VIEW_W / 2, cy - 220, `${stats.difficulty} 制覇!`, {
       fontFamily: '"Arial Black", sans-serif', fontSize: '46px',
       color: '#ffd24a', stroke: '#7a4a21', strokeThickness: 10,
     }).setOrigin(0.5).setResolution(2);
-    const sub = this.add.text(VIEW_W / 2, cy - 150, '黒き魔導士を打ち倒し\n道場の頂に立った! 🎉', {
+    const sub = this.add.text(VIEW_W / 2, cy - 158, '黒き魔導士を打ち倒し\n道場の頂に立った! 🎉', {
       fontFamily: 'sans-serif', fontSize: '22px', color: '#ffffff', align: 'center',
     }).setOrigin(0.5).setResolution(2);
     const m = Math.floor(stats.time / 60), s = stats.time % 60;
-    const statsText = this.add.text(VIEW_W / 2, cy - 40,
+    const statsText = this.add.text(VIEW_W / 2, cy - 56,
       `とうたつレベル: Lv.${stats.level}\n制覇タイム: ${m}分${s}秒`, {
-        fontFamily: 'sans-serif', fontSize: '24px', color: '#cfe0ff', align: 'center', lineSpacing: 10,
+        fontFamily: 'sans-serif', fontSize: '23px', color: '#cfe0ff', align: 'center', lineSpacing: 10,
       }).setOrigin(0.5).setResolution(2);
-    const w = this.add.sprite(VIEW_W / 2 - 60, cy + 90, 'warrior5_0').setScale(4);
-    const mg = this.add.sprite(VIEW_W / 2 + 60, cy + 90, 'mage5_0').setScale(4).setFlipX(true);
+    c.add([dim, title, sub, statsText]);
+    if (stats.unlockedNext) {
+      c.add(this.add.text(VIEW_W / 2, cy + 8, `🔓 ${stats.unlockedNext} 解放!`, {
+        fontFamily: '"Arial Black", sans-serif', fontSize: '22px', color: '#8effa0', stroke: '#1a3d1a', strokeThickness: 4,
+      }).setOrigin(0.5).setResolution(2));
+    }
+    const w = this.add.sprite(VIEW_W / 2 - 60, cy + 100, 'warrior5_0').setScale(4);
+    const mg = this.add.sprite(VIEW_W / 2 + 60, cy + 100, 'mage5_0').setScale(4).setFlipX(true);
     this.tweens.add({ targets: [w, mg], y: '-=14', duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    c.add([dim, title, sub, statsText, w, mg]);
+    c.add([w, mg]);
     c.add(this.makeOverlayButton(VIEW_W / 2, cy + 210, 'タイトルへもどる', 0xffb347, () => this.toTitle()));
     this.overlay = c;
   }
@@ -494,7 +501,7 @@ export default class HudScene extends Phaser.Scene {
     this.drawBars();
     this.drawBossBar();
     this.stageText.setText(`第 ${ui.floor} 階 / ${ui.total}`);
-    this.killText.setText(`${ui.floorName}\n推奨 Lv.${ui.reqLevel}`);
+    this.killText.setText(`${ui.floorName}  [${DIFFICULTIES[ui.difficulty].name}]`);
     this.killText.setColor(ui.underLeveled ? '#ff8a8a' : '#dcd2ff');
 
     ui.skills.forEach((s, i) => {
@@ -508,9 +515,10 @@ export default class HudScene extends Phaser.Scene {
       btn.container.setAlpha(noMp ? 0.55 : 1);
     });
 
-    // エリクサー(残数表示)
+    // エリクサー(残数 + クールタイム表示)
     if (this.potionHpBtn.sub) this.potionHpBtn.sub.setText(String(ui.elixirs));
-    this.potionHpBtn.container.setAlpha(ui.elixirs > 0 ? 1 : 0.5);
+    this.drawCooldown(this.potionHpBtn, ui.elixirCdLeft, 6000);
+    this.potionHpBtn.container.setAlpha(ui.elixirs > 0 && ui.elixirCdLeft <= 0 ? 1 : 0.55);
     this.drawCooldown(this.switchBtn, ui.switchCdLeft, 2000);
   }
 }
