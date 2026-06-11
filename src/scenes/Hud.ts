@@ -190,13 +190,95 @@ export default class HudScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#dcd2ff', align: 'center',
     }).setOrigin(0.5).setResolution(2);
 
-    // ミュートボタン
-    const mute = this.add.text(VIEW_W - 28, 106, '🔊', { fontSize: '24px' }).setOrigin(0.5);
-    mute.setInteractive({ useHandCursor: true });
-    mute.on('pointerdown', () => {
+    // 操作ボタン: 音量 → 一時停止 → トップに戻る の順
+    const iconY = 108;
+    const mk = (x: number, draw: (g: Phaser.GameObjects.Graphics, pressed: boolean) => void, onTap: () => void) => {
+      const c = this.add.container(x, iconY).setDepth(60);
+      const g = this.add.graphics();
+      const render = (pressed: boolean) => {
+        g.clear();
+        g.fillStyle(0x2a2440, pressed ? 1 : 0.82);
+        g.fillCircle(0, 0, 21);
+        g.lineStyle(2, 0x8a7ac4, 0.9);
+        g.strokeCircle(0, 0, 21);
+        draw(g, pressed);
+      };
+      render(false);
+      c.add(g);
+      c.setSize(46, 46).setInteractive({ useHandCursor: true });
+      c.on('pointerdown', () => { render(true); onTap(); this.time.delayedCall(120, () => render(false)); });
+      return { c, render };
+    };
+
+    // 音量(ミュート切替)
+    let volRender: (p: boolean) => void = () => {};
+    const drawVol = (g: Phaser.GameObjects.Graphics) => {
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(-9, -5, 5, 10);
+      g.fillTriangle(-4, -8, -4, 8, 5, 0);
+      if (isMuted()) {
+        g.lineStyle(2.5, 0xff5a5a, 1);
+        g.lineBetween(-2, -8, 10, 8);
+      } else {
+        g.lineStyle(2, 0xffffff, 0.9);
+        g.beginPath(); g.arc(5, 0, 6, -0.8, 0.8); g.strokePath();
+        g.beginPath(); g.arc(5, 0, 9, -0.7, 0.7); g.strokePath();
+      }
+    };
+    const vol = mk(VIEW_W - 122, (g) => drawVol(g), () => { setMuted(!isMuted()); volRender(false); });
+    volRender = vol.render;
+
+    // 一時停止
+    mk(VIEW_W - 74, (g) => {
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(-6, -8, 4, 16);
+      g.fillRect(3, -8, 4, 16);
+    }, () => this.showPause());
+
+    // トップに戻る(家アイコン)
+    mk(VIEW_W - 26, (g) => {
+      g.fillStyle(0xffe9b0, 1);
+      g.fillTriangle(0, -10, -11, 0, 11, 0);      // 屋根
+      g.fillRect(-8, 0, 16, 9);                     // 壁
+      g.fillStyle(0x2a2440, 1);
+      g.fillRect(-3, 2, 6, 7);                      // ドア
+    }, () => this.confirmHome());
+  }
+
+  // 一時停止画面
+  private showPause() {
+    if (this.overlay) return;
+    sfx('select');
+    const cy = VIEW_H / 2;
+    const c = this.add.container(0, 0).setDepth(120);
+    const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x05030a, 0.7).setInteractive();
+    const title = this.add.text(VIEW_W / 2, cy - 140, 'PAUSE', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '52px', color: '#ffe9b0', stroke: '#4a2a5a', strokeThickness: 9,
+    }).setOrigin(0.5).setResolution(2);
+    c.add([dim, title]);
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy - 30, 'ゲームにもどる', 0x4aa84a, () => this.clearOverlay()));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 58, isMuted() ? '🔇 音量オン' : '🔊 音量オフ', 0x3a6ad8, () => {
       setMuted(!isMuted());
-      mute.setText(isMuted() ? '🔇' : '🔊');
-    });
+      this.clearOverlay();
+      this.showPause();
+    }));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 146, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
+    this.overlay = c;
+  }
+
+  private confirmHome() {
+    if (this.overlay) return;
+    sfx('select');
+    const cy = VIEW_H / 2;
+    const c = this.add.container(0, 0).setDepth(120);
+    const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x05030a, 0.7).setInteractive();
+    const t = this.add.text(VIEW_W / 2, cy - 80, 'タイトルへ戻りますか?\n(レベルは記憶されます)', {
+      fontFamily: 'sans-serif', fontSize: '22px', color: '#ffffff', align: 'center', lineSpacing: 8, stroke: '#1a1430', strokeThickness: 5,
+    }).setOrigin(0.5).setResolution(2);
+    c.add([dim, t]);
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 10, 'もどる', 0xff8a2a, () => this.toTitle()));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 98, 'つづける', 0x6a6a8a, () => this.clearOverlay()));
+    this.overlay = c;
   }
 
   // ============================================================
@@ -353,10 +435,10 @@ export default class HudScene extends Phaser.Scene {
     // エリクサー(HP/MP全回復・1種)
     this.potionHpBtn = this.makeButton(232, VIEW_H - 246, { r: 34, color: 0xd8930f, icon: 'elixir_0', iconScale: 2.4, sub: '0' }, () => game().useElixir());
 
-    // キャラ交代(ステータスパネルの下)
-    this.switchBtn = this.makeButton(48, 200, { r: 28, color: 0x4aa84a, label: '' }, () => game().switchChar());
-    this.switchIcon = this.add.sprite(48, 198, 'mage_0').setScale(1.7);
-    this.add.text(48, 224, '交代', {
+    // キャラ交代(攻撃ボタンの上に間隔を開けて配置 → 押し分けやすく)
+    this.switchBtn = this.makeButton(498, VIEW_H - 210, { r: 30, color: 0x4aa84a, label: '' }, () => game().switchChar());
+    this.switchIcon = this.add.sprite(498, VIEW_H - 212, 'mage_0').setScale(1.9);
+    this.add.text(498, VIEW_H - 236, '交代', {
       fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', stroke: '#1a3d1a', strokeThickness: 3,
     }).setOrigin(0.5).setResolution(2);
   }

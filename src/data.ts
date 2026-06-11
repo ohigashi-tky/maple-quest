@@ -60,9 +60,11 @@ export interface CharDef {
   tiers: JobTier[];
 }
 
-// 転職レベル: 1次=Lv1 / 2次=30 / 3次=60 / 4次=100 / 5次=150
-export const JOB_LEVELS = [1, 30, 60, 100, 150];
+// 転職レベル: 1次=Lv1 / 2次=10 / 3次=30 / 4次=60 / 5次=100
+export const JOB_LEVELS = [1, 10, 30, 60, 100];
 export const LEVEL_CAP = 999;
+// HP/MPの自然回復(毎秒・最大値に対する割合)。戦士=HP, 魔法使い=MP
+export const REGEN_PCT_PER_SEC = 0.012;
 
 export const CHARACTERS: Record<CharKey, CharDef> = {
   // ========== 戦士: ダークナイト系列(剣士→スピアマン→ドラゴンナイト→ダークナイト) ==========
@@ -84,7 +86,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 30, jobName: 'スピアマン', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.25,
+        minLevel: 10, jobName: 'スピアマン', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.25,
         skills: [
           { id: 'w2a', name: 'スピアクラッシュ', mp: 7, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
           { id: 'w2b', name: 'ファイナルアタック', mp: 12, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
@@ -92,7 +94,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 60, jobName: 'ドラゴンナイト', rankName: '3次', spriteKey: 'warrior3', atkBonus: 1.55,
+        minLevel: 30, jobName: 'ドラゴンナイト', rankName: '3次', spriteKey: 'warrior3', atkBonus: 1.55,
         skills: [
           { id: 'w3a', name: 'ドラゴンバスター', mp: 8, cd: 800, kind: 'melee', mult: 1.7, hits: 4, range: 56 },
           { id: 'w3b', name: 'ドラゴンフューリー', mp: 14, cd: 1700, kind: 'aoe', mult: 1.5, hits: 4, radius: 90 },
@@ -100,7 +102,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 100, jobName: 'ダークナイト', rankName: '4次', spriteKey: 'warrior4', atkBonus: 2.0,
+        minLevel: 60, jobName: 'ダークナイト', rankName: '4次', spriteKey: 'warrior4', atkBonus: 2.0,
         skills: [
           { id: 'w4a', name: 'サウザンドスピア', mp: 10, cd: 850, kind: 'melee', mult: 1.6, hits: 6, range: 62 },
           { id: 'w4b', name: 'ガングニールの降臨', mp: 18, cd: 2000, kind: 'aoe', mult: 1.8, hits: 5, radius: 110 },
@@ -108,7 +110,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 150, jobName: 'ダークナイト・極', rankName: '5次', spriteKey: 'warrior5', atkBonus: 2.6,
+        minLevel: 100, jobName: 'ダークナイト・極', rankName: '5次', spriteKey: 'warrior5', atkBonus: 2.6,
         skills: [
           { id: 'w5a', name: 'ダークインペール', mp: 12, cd: 800, kind: 'melee', mult: 1.9, hits: 8, range: 70 },
           { id: 'w5b', name: 'ガングニールの咆哮', mp: 22, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
@@ -136,7 +138,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 30, jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.25,
+        minLevel: 10, jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.25,
         skills: [
           { id: 'm2a', name: 'コールドビーム', mp: 8, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 1800 },
           { id: 'm2b', name: 'サンダーボルト', mp: 12, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
@@ -144,7 +146,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 60, jobName: 'メイジ', rankName: '3次', spriteKey: 'mage3', atkBonus: 1.55,
+        minLevel: 30, jobName: 'メイジ', rankName: '3次', spriteKey: 'mage3', atkBonus: 1.55,
         skills: [
           { id: 'm3a', name: 'アイスストライク', mp: 10, cd: 1100, kind: 'freeze', mult: 1.6, hits: 3, radius: 100, durMs: 2200 },
           { id: 'm3b', name: 'ライトニングボルト', mp: 14, cd: 1500, kind: 'thunder', mult: 1.5, hits: 1, targets: 5, range: 130 },
@@ -152,7 +154,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 100, jobName: 'アークメイジ', rankName: '4次', spriteKey: 'mage4', atkBonus: 2.0,
+        minLevel: 60, jobName: 'アークメイジ', rankName: '4次', spriteKey: 'mage4', atkBonus: 2.0,
         skills: [
           { id: 'm4a', name: 'ブリザード', mp: 14, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 2000 },
           { id: 'm4b', name: 'チェーンライトニング', mp: 16, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
@@ -160,7 +162,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         ],
       },
       {
-        minLevel: 150, jobName: 'アークメイジ・極', rankName: '5次', spriteKey: 'mage5', atkBonus: 2.6,
+        minLevel: 100, jobName: 'アークメイジ・極', rankName: '5次', spriteKey: 'mage5', atkBonus: 2.6,
         skills: [
           { id: 'm5a', name: 'フローズンオーブ', mp: 14, cd: 1000, kind: 'projectile', mult: 1.8, hits: 4, speed: 300, pierce: true },
           { id: 'm5b', name: 'サンダーブレイク', mp: 22, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
@@ -242,25 +244,25 @@ const FLOOR_SEEDS: FloorSeed[] = [
   { key: 'bluemushmom', name: 'ブルーマッシュモム', title: '青き森の主', req: 8, arch: 'mush', tint: 0x5a8fe0, scale: 1.45 },
   { key: 'faust', name: 'ファウスト', title: '闇の従者', req: 16, arch: 'demon', tint: 0x7a52b4, scale: 1.4 },
   { key: 'dyle', name: 'ダイル', title: '沼の捕食者', req: 24, arch: 'drake', tint: 0x4a9c3a, scale: 1.45 },
-  { key: 'jrbalrog', name: 'ジュニアバルログ', title: '小さき災い', req: 32, arch: 'demon', tint: 0xc04a2a, major: true, scale: 1.7 },
+  { key: 'jrbalrog', name: 'ジュニアバルログ', title: '小さき災い', req: 32, arch: 'demon', tint: 0xc04a2a, major: true, scale: 2.2 },
 
   { key: 'stumpy', name: 'スタンピー', title: '怒れる古木', req: 42, arch: 'golem', tint: 0x8a5a32, scale: 1.5 },
   { key: 'griffey', name: 'グリフィー', title: '天空の猛禽', req: 52, arch: 'beast', tint: 0xe0a030, scale: 1.5 },
   { key: 'manon', name: 'マノン', title: '古龍', req: 64, arch: 'drake', tint: 0xd86a9c, scale: 1.55 },
   { key: 'anego', name: 'アネゴ', title: '夜叉の女傑', req: 76, arch: 'lord', tint: 0xd84a6a, scale: 1.45 },
-  { key: 'crimsonbalrog', name: 'クリムゾンバルログ', title: '深紅の魔王', req: 88, arch: 'demon', tint: 0xd81a1a, major: true, scale: 1.95 },
+  { key: 'crimsonbalrog', name: 'クリムゾンバルログ', title: '深紅の魔王', req: 88, arch: 'demon', tint: 0xd81a1a, major: true, scale: 2.5 },
 
   { key: 'dunas', name: 'デュナス', title: '機械龍', req: 100, arch: 'drake', tint: 0x4a7fd6, scale: 1.6 },
   { key: 'pierre', name: 'ピエール', title: '深淵の道化', req: 112, arch: 'lord', tint: 0xb04ad8, scale: 1.5 },
   { key: 'vonleon', name: 'ヴァンレオン', title: '獅子王', req: 124, arch: 'lord', tint: 0x3a6ae8, scale: 1.55 },
   { key: 'hilla', name: 'ヒルラ', title: '血の魔女', req: 136, arch: 'lord', tint: 0x8a1a4a, scale: 1.5 },
-  { key: 'zakum', name: 'ザクム', title: '炎の巨神', req: 150, arch: 'golem', tint: 0xd8541a, major: true, scale: 2.1 },
+  { key: 'zakum', name: 'ザクム', title: '炎の巨神', req: 150, arch: 'golem', tint: 0xd8541a, major: true, scale: 2.7 },
 
   { key: 'horntail', name: 'ホーンテイル', title: '双頭の邪龍', req: 168, arch: 'drake', tint: 0x3aa84a, scale: 1.85 },
   { key: 'magnus', name: 'マグナス', title: '堕ちた翼', req: 186, arch: 'lord', tint: 0x2a2a3a, scale: 1.6 },
   { key: 'lucid', name: 'ルシード', title: '夢幻の蝶', req: 204, arch: 'lord', tint: 0x6ad8c4, scale: 1.6 },
   { key: 'damien', name: 'デミアン', title: '絶望の剣', req: 224, arch: 'lord', tint: 0xc02a3a, scale: 1.65 },
-  { key: 'blackmage', name: 'ブラックマゲ', title: '黒き魔導士', req: 250, arch: 'lord', tint: 0x1a1024, major: true, scale: 2.3 },
+  { key: 'blackmage', name: 'ブラックマゲ', title: '黒き魔導士', req: 250, arch: 'lord', tint: 0x1a1024, major: true, scale: 3.0 },
 ];
 
 function themeForFloor(f: number): Theme {
@@ -298,7 +300,7 @@ export const FLOORS: FloorDef[] = FLOOR_SEEDS.map((s, i) => ({
 export const TOTAL_FLOORS = FLOORS.length;
 export const GROUND_Y = 432;
 export const WORLD_H = 600;
-export const ARENA_W = 720; // 道場アリーナの横幅(コンパクト)
+export const ARENA_W = 560; // 道場アリーナの横幅(狭め・道場らしく)
 
 // ============================================================
 // 難易度(クリアで次が解放。各段階で敵が強くなる)

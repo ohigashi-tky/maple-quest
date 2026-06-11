@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import {
   CHARACTERS, FLOORS, TOTAL_FLOORS, GROUND_Y, WORLD_H, ARENA_W,
   expForLevel, newProgress, tierFor, tierIndexFor,
-  atkScale, hpScale, mpScale, critRate, critMul, fmt, ELIXIR_MAX, LEVEL_CAP,
+  atkScale, hpScale, mpScale, critRate, critMul, fmt, ELIXIR_MAX, LEVEL_CAP, REGEN_PCT_PER_SEC,
   bossHp, bossAtk, bossExp, playerHitChance, playerDamageScale, enemyDamageScale, effReq,
-  loadSave, writeSave, themeTile, themeBgm, DIFFICULTIES,
+  loadSave, writeSave, themeTile, DIFFICULTIES,
   type CharKey, type Progress, type FloorDef, type JobTier, type SkillDef,
 } from '../data';
 import { sfx, playBgm, stopBgm } from '../audio';
@@ -58,6 +58,8 @@ interface BossSprite extends Phaser.Physics.Arcade.Sprite {
   dying?: boolean;
   frozenUntil?: number;
   stunUntil?: number;
+  dmgStackAt?: number;  // 直近のダメージ表示時刻(多段の積み重ね用)
+  dmgStackN?: number;   // 連続ヒット数
 }
 
 export default class GameScene extends Phaser.Scene {
@@ -136,7 +138,8 @@ export default class GameScene extends Phaser.Scene {
     this.buildKeyboard();
     this.buildUiState();
 
-    playBgm(themeBgm(this.floor.theme));
+    // 中ボスはかっこいい戦闘曲、5層ごとの強敵はより激しいエピック曲
+    playBgm(this.floor.major ? 'epic' : 'battle');
     this.cameras.main.fadeIn(400, 0, 0, 0);
 
     // 階層イントロ → ボス出現
@@ -214,10 +217,69 @@ export default class GameScene extends Phaser.Scene {
       }
     }
     for (let x = 40; x < w; x += Phaser.Math.Between(140, 240)) {
-      this.add.image(x, Phaser.Math.Between(60, 160), 'cloud_0').setDepth(-15)
+      this.add.image(x, Phaser.Math.Between(50, 140), 'cloud_0').setDepth(-15)
         .setScrollFactor(0.3, 0.6)
         .setAlpha(this.floor.theme === 'dark' || this.floor.theme === 'void' ? 0.16 : 0.85)
-        .setScale(Phaser.Math.FloatBetween(0.7, 1.3));
+        .setScale(Phaser.Math.FloatBetween(0.6, 1.1));
+    }
+    this.buildDojoDecor(w);
+  }
+
+  // 道場らしい装飾: 左右の柱・後壁の帯・幕・灯り(テーマ別)
+  private buildDojoDecor(w: number) {
+    const theme = this.floor.theme;
+    const pal: Record<string, { wall: number; beam: number; accent: number; rope: number }> = {
+      grass: { wall: 0x8a5a32, beam: 0x6a4422, accent: 0xc23a3a, rope: 0xe0b050 },
+      sky: { wall: 0xb0a0d8, beam: 0x8a78b8, accent: 0x4a7fd6, rope: 0xe0e8ff },
+      dark: { wall: 0x3a2d52, beam: 0x261c3a, accent: 0x8a5acc, rope: 0xc09040 },
+      void: { wall: 0x241830, beam: 0x140c1e, accent: 0xc02a6a, rope: 0x8a3a9c },
+    };
+    const c = pal[theme];
+    const g = this.add.graphics().setDepth(-8);
+
+    // 背面の道場の壁(腰高の羽目板)
+    g.fillStyle(c.wall, theme === 'grass' ? 0.55 : 0.7);
+    g.fillRect(0, GROUND_Y - 96, w, 96);
+    g.fillStyle(c.beam, 0.6);
+    g.fillRect(0, GROUND_Y - 96, w, 8);          // 上桁
+    g.fillRect(0, GROUND_Y - 30, w, 6);          // 腰板の境
+    for (let x = 24; x < w; x += 56) g.fillRect(x, GROUND_Y - 96, 5, 96); // 縦柱
+
+    // 左右の太い柱
+    g.fillStyle(c.beam, 0.95);
+    g.fillRect(0, GROUND_Y - 200, 16, 200);
+    g.fillRect(w - 16, GROUND_Y - 200, 16, 200);
+    g.fillStyle(c.wall, 1);
+    g.fillRect(2, GROUND_Y - 200, 12, 200);
+    g.fillRect(w - 14, GROUND_Y - 200, 12, 200);
+    // 柱頭
+    g.fillStyle(c.beam, 1);
+    g.fillRect(-2, GROUND_Y - 206, 20, 8);
+    g.fillRect(w - 18, GROUND_Y - 206, 20, 8);
+
+    // 上部に渡した横断幕
+    g.fillStyle(c.accent, 0.92);
+    g.fillRect(18, GROUND_Y - 196, w - 36, 22);
+    g.fillStyle(0xffffff, 0.16);
+    g.fillRect(18, GROUND_Y - 196, w - 36, 5);
+    // 幕の房飾り
+    g.fillStyle(c.rope, 1);
+    for (let x = 30; x < w - 24; x += 28) g.fillTriangle(x, GROUND_Y - 174, x - 5, GROUND_Y - 174, x, GROUND_Y - 166);
+
+    // 道場名の円印(中央)
+    g.fillStyle(c.rope, 0.9);
+    g.fillCircle(w / 2, GROUND_Y - 185, 9);
+    g.fillStyle(c.accent, 1);
+    g.fillCircle(w / 2, GROUND_Y - 185, 6);
+
+    // 暗いテーマは左右に松明の灯り
+    if (theme === 'dark' || theme === 'void') {
+      for (const tx of [30, w - 30]) {
+        const fire = this.add.circle(tx, GROUND_Y - 150, 7, theme === 'void' ? 0xc02a6a : 0xffb347, 0.85).setDepth(-7);
+        this.tweens.add({ targets: fire, scale: 1.3, alpha: 0.5, duration: 420, yoyo: true, repeat: -1 });
+        const glow = this.add.circle(tx, GROUND_Y - 150, 18, theme === 'void' ? 0xc02a6a : 0xffb347, 0.18).setDepth(-7);
+        this.tweens.add({ targets: glow, scale: 1.25, duration: 600, yoyo: true, repeat: -1 });
+      }
     }
   }
 
@@ -386,16 +448,18 @@ export default class GameScene extends Phaser.Scene {
     if (b.frozenUntil && this.time.now < b.frozenUntil) return;
     if (b.stunUntil && this.time.now < b.stunUntil) return;
     const arch = b.floor.archetype;
-    // アーキタイプごとの攻撃プール(複数からランダム選択)
+    // アーキタイプ(キャラ性)ごとの攻撃プール(複数からランダム選択)
     const pools: Record<string, string[]> = {
-      mush: ['slam', 'ring', 'rain'],
-      golem: ['slam', 'spikes', 'rain'],
-      demon: ['fan', 'homing', 'ring'],
-      drake: ['fan', 'rain', 'beam'],
-      beast: ['dash', 'fan', 'spikes'],
-      lord: ['bolt', 'orbBurst', 'beam', 'homing', 'rain'],
+      mush: ['slam', 'ring', 'spikes'],                   // キノコ: 跳ねて潰す・胞子をまく
+      golem: ['slam', 'spikes', 'rain', 'volley'],        // 巨人: 叩きつけ・岩飛ばし
+      demon: ['fan', 'homing', 'ring', 'dash'],           // 魔神: 火球弾幕・突進
+      drake: ['fan', 'rain', 'beam', 'spiral'],           // 竜: ブレス・薙ぎ払い
+      beast: ['dash', 'fan', 'spikes', 'volley'],         // 猛獣: 急襲・爪連撃
+      lord: ['bolt', 'orbBurst', 'beam', 'homing', 'spiral'], // 君主: 落雷・弾幕・ビーム
     };
-    const pool = pools[arch] ?? ['fan'];
+    let pool = pools[arch] ?? ['fan'];
+    // 強敵(5層ボス)は怒り時に強力な弾幕(spiral)を多用
+    if (b.floor.major && b.hp < b.maxhp * 0.5) pool = [...pool, 'spiral', 'ring'];
     const pick = pool[Phaser.Math.Between(0, pool.length - 1)];
     switch (pick) {
       case 'slam': this.atkSlam(b); break;
@@ -408,6 +472,38 @@ export default class GameScene extends Phaser.Scene {
       case 'spikes': this.atkSpikes(b); break;
       case 'homing': this.atkHoming(b); break;
       case 'beam': this.atkBeam(b); break;
+      case 'spiral': this.atkSpiral(b); break;
+      case 'volley': this.atkVolley(b); break;
+    }
+  }
+
+  // 回転スパイラル弾(渦を巻く弾幕)
+  private atkSpiral(b: BossSprite) {
+    const arms = b.floor.major ? 3 : 2;
+    const shots = 10;
+    const tex = b.floor.archetype === 'demon' ? 'fx_fire_0' : 'fx_orb_0';
+    for (let i = 0; i < shots; i++) {
+      this.time.delayedCall(i * 70, () => {
+        if (!b.active || this.over) return;
+        for (let a = 0; a < arms; a++) {
+          const ang = (i * 0.5) + (a / arms) * Math.PI * 2;
+          this.eShot(b, b.x, b.y, tex, Math.cos(ang) * 100, Math.sin(ang) * 100, 1, 3200);
+        }
+        if (i % 3 === 0) sfx('fire');
+      });
+    }
+  }
+
+  // 狙い撃ち連射(素早い3連弾)
+  private atkVolley(b: BossSprite) {
+    const n = b.hp < b.maxhp * 0.5 ? 4 : 3;
+    for (let i = 0; i < n; i++) {
+      this.time.delayedCall(i * 110, () => {
+        if (!b.active || this.over) return;
+        const ang = Math.atan2(this.player.y - b.y, this.player.x - b.x);
+        this.eShot(b, b.x, b.y, 'fx_star_0', Math.cos(ang) * 170, Math.sin(ang) * 170, 1.2, 2600);
+        sfx('claw');
+      });
     }
   }
 
@@ -1080,24 +1176,32 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private damageNumber(e: BossSprite, dmg: number, crit: boolean) {
-    const x = e.x + Phaser.Math.Between(-10, 10);
-    const y = e.y - e.displayHeight / 2 - 6;
+    const now = this.time.now;
+    // 多段ヒットは縦に積み上げる(メイプル風)。短い間隔の連続ヒットを束ねて上へ重ねる
+    if (e.dmgStackAt && now - e.dmgStackAt < 520) e.dmgStackN = (e.dmgStackN ?? 0) + 1;
+    else e.dmgStackN = 0;
+    e.dmgStackAt = now;
+    const stack = e.dmgStackN ?? 0;
+    const x = e.x + (stack % 2 === 0 ? -1 : 1) * Math.min(8, stack * 2);
+    const baseY = e.y - e.displayHeight / 2 - 8;
+    const y = baseY - stack * 11; // 段数ぶん上へ積む
     const t = this.add.text(x, y, fmt(dmg), {
       fontFamily: '"Arial Black", sans-serif',
-      fontSize: crit ? '13px' : '10px',
+      fontSize: crit ? '14px' : '11px',
       color: crit ? '#ffe45a' : '#ffffff',
       stroke: crit ? '#d23c1a' : '#a8500a',
       strokeThickness: crit ? 4 : 3,
     }).setOrigin(0.5).setDepth(21).setResolution(4);
     if (crit) {
       const ex = this.add.text(x + t.width / 2 + 2, y - 4, '!', {
-        fontFamily: '"Arial Black", sans-serif', fontSize: '13px', color: '#ffd24a', stroke: '#d23c1a', strokeThickness: 4,
+        fontFamily: '"Arial Black", sans-serif', fontSize: '14px', color: '#ffd24a', stroke: '#d23c1a', strokeThickness: 4,
       }).setOrigin(0.5).setDepth(21).setResolution(4);
-      this.tweens.add({ targets: ex, y: y - 22, alpha: 0, duration: 750, onComplete: () => ex.destroy() });
-      t.setScale(1.5);
-      this.tweens.add({ targets: t, scale: 1, duration: 180, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: ex, y: y - 16, alpha: 0, duration: 700, delay: 120, onComplete: () => ex.destroy() });
     }
-    this.tweens.add({ targets: t, y: y - 20, alpha: 0, duration: 780, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+    // 出現時に弾む → ゆっくり上昇して消える
+    t.setScale(0.4);
+    this.tweens.add({ targets: t, scale: crit ? 1.25 : 1, duration: 130, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, y: y - 14, alpha: 0, duration: 900, delay: 200, ease: 'Quad.easeOut', onComplete: () => t.destroy() });
   }
 
   private missNumber(e: BossSprite) {
@@ -1123,7 +1227,9 @@ export default class GameScene extends Phaser.Scene {
       onComplete: () => e.destroy(),
     });
     // 撃破でエリクサー補充
-    this.progress.elixirs = Math.min(this.progress.elixirs + (e.floor.major ? 4 : 2), ELIXIR_MAX);
+    // ステージクリアでエリクサーを5個支給
+    this.progress.elixirs = Math.min(this.progress.elixirs + 5, ELIXIR_MAX);
+    this.floatText(this.player.x, this.player.y - 44, 'エリクサー +5', '#ffd24a');
     // 最高到達階層を更新して保存
     this.persist(Math.max(this.progress.floor, this.floor.floor + 1));
 
@@ -1303,14 +1409,28 @@ export default class GameScene extends Phaser.Scene {
   // ============================================================
   // 更新ループ
   // ============================================================
-  update() {
+  update(_time: number, delta: number) {
     if (this.over || this.transitioning) { this.syncUiState(); return; }
+    this.updateRegen(delta);
     this.updatePlayerMove();
     this.updateBoss();
     this.updateShots();
     this.updatePickups();
     this.updatePortal();
     this.syncUiState();
+  }
+
+  // 自然回復: 戦士はHP、魔法使いはMPを毎秒わずかに回復
+  private updateRegen(delta: number) {
+    const dt = delta / 1000;
+    const st = this.charState;
+    if (this.progress.charKey === 'warrior') {
+      const max = this.maxHp('warrior');
+      if (st.hp < max) st.hp = Math.min(max, st.hp + max * REGEN_PCT_PER_SEC * dt);
+    } else {
+      const max = this.maxMp('mage');
+      if (st.mp < max) st.mp = Math.min(max, st.mp + max * REGEN_PCT_PER_SEC * dt);
+    }
   }
 
   private updatePlayerMove() {
@@ -1379,24 +1499,35 @@ export default class GameScene extends Phaser.Scene {
     }
 
     const enraged = b.hp < b.maxhp * 0.5;
-    const spd = b.floor.archetype === 'beast' ? 80 : 46;
+    // ダッシュ攻撃などで速度が高い間はAIの移動を上書きしない
+    const dashing = Math.abs(body.velocity.x) > 180 || Math.abs(body.velocity.y) > 200;
+    const spd = (b.floor.archetype === 'beast' ? 78 : 50) * (enraged ? 1.4 : 1);
+    // アーキタイプごとの「保ちたい間合い」(近接ボスは近め、遠隔ボスは遠め)
+    const keep = ({ golem: 46, mush: 50, beast: 40, drake: 96, demon: 100, lord: 116 } as Record<string, number>)[b.floor.archetype] ?? 70;
+    const dx = this.player.x - b.x;
+    const adx = Math.abs(dx);
+    const face = Math.sign(dx) || b.dir || 1;
+    b.dir = face;
+    b.setFlipX(face < 0);
+
     if (b.flying) {
-      const dx = this.player.x - b.x;
-      const dy = (this.player.y - 14) - b.y;
-      body.setVelocity(
-        Phaser.Math.Clamp(dx, -1, 1) * spd * (enraged ? 1.5 : 1),
-        Phaser.Math.Clamp(dy, -1, 1) * spd * 0.5 + Math.sin(now / 300 + b.x) * 14
-      );
-      b.setFlipX(dx < 0);
-    } else {
-      if (now > b.aiTimer) {
-        b.aiTimer = now + Phaser.Math.Between(900, 1800);
-        b.dir = Math.sign(this.player.x - b.x) || 1;
-      }
-      if (b.x < 24) b.dir = 1;
-      if (b.x > ARENA_W - 24) b.dir = -1;
-      if (Math.abs(body.velocity.x) < 200) body.setVelocityX(b.dir * spd * (enraged ? 1.6 : 1));
-      b.setFlipX(b.dir < 0);
+      const dy = (this.player.y - 16) - b.y;
+      let vx = 0;
+      if (adx > keep + 18) vx = face * spd;          // 遠い→寄る
+      else if (adx < keep - 18) vx = -face * spd * 0.8; // 近すぎ→離れる
+      else vx = Math.sin(now / 500 + b.x) * spd * 0.4;  // 間合い維持で漂う
+      // 画面端で押し戻し
+      if (b.x < 30) vx = Math.abs(vx) + 20;
+      if (b.x > ARENA_W - 30) vx = -Math.abs(vx) - 20;
+      body.setVelocity(vx, Phaser.Math.Clamp(dy, -1, 1) * spd * 0.5 + Math.sin(now / 320 + b.x) * 12);
+    } else if (!dashing) {
+      let vx = 0;
+      if (adx > keep + 16) vx = face * spd;
+      else if (adx < keep - 16) vx = -face * spd * 0.9;  // 近すぎたら下がる(まとわりつき防止)
+      else vx = 0;                                        // 間合い内は止まって攻撃
+      if (b.x < 26) vx = spd;
+      if (b.x > ARENA_W - 26) vx = -spd;
+      body.setVelocityX(vx);
     }
     this.drawBossHpBar(b, now);
   }

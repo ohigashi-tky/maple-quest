@@ -110,7 +110,13 @@ export function sfx(name: SfxName) {
 // ---------- BGM (簡易ステップシーケンサー / オリジナル曲) ----------
 // semitone: A4=440 基準のインデックス。null は休符。
 const N = (s: number) => 440 * Math.pow(2, s / 12);
-interface Song { bpm: number; lead: (number | null)[]; bass: (number | null)[]; }
+interface Song {
+  bpm: number;
+  lead: (number | null)[];
+  bass: (number | null)[];
+  arp?: (number | null)[]; // きらびやかな上モノ
+  drums?: number[];        // 0=無 1=キック 2=スネア 3=ハイハット
+}
 
 const SONGS: Record<string, Song> = {
   title: {
@@ -147,6 +153,30 @@ const SONGS: Record<string, Song> = {
            0, 0, 3, 0, 7, 0, 5, 3, 8, 7, 5, 3, 2, 3, 2, -2],
     bass: [-24, -12, -24, -12, -24, -12, -24, -12, -26, -14, -26, -14, -26, -14, -26, -14,
            -24, -12, -24, -12, -24, -12, -24, -12, -19, -19, -21, -21, -22, -22, -23, -23],
+  },
+  // 中ボス: 疾走感のあるかっこいい戦闘曲(マイナー・ドラム+アルペジオ)
+  battle: {
+    bpm: 150,
+    lead: [12, null, 10, 12, 15, 12, 10, 8, 7, null, 8, 10, 12, 10, 8, 7,
+           5, null, 7, 8, 10, 8, 7, 5, 8, 10, 12, 15, 17, 15, 12, 10],
+    bass: [-12, -12, -24, -12, -12, -12, -24, -12, -14, -14, -26, -14, -14, -14, -26, -14,
+           -17, -17, -29, -17, -17, -17, -29, -17, -16, -16, -28, -16, -19, -19, -19, -19],
+    arp: [0, 3, 7, 12, 7, 3, 0, 3, -2, 2, 5, 10, 5, 2, -2, 2,
+          -5, -1, 2, 7, 2, -1, -5, -1, -4, 0, 3, 8, 12, 8, 3, 0],
+    drums: [1, 3, 2, 3, 1, 3, 2, 3, 1, 3, 2, 3, 1, 3, 2, 3,
+            1, 3, 2, 3, 1, 3, 2, 3, 1, 3, 2, 1, 2, 1, 2, 3],
+  },
+  // 5層ボス: より荘厳で激しいエピック曲(高速・厚いベース・ドラム)
+  epic: {
+    bpm: 168,
+    lead: [0, 12, 11, 12, 7, 12, 10, 12, -2, 10, 8, 10, 5, 10, 8, 10,
+           3, 15, 14, 15, 10, 15, 14, 15, 7, 19, 17, 15, 14, 12, 10, 8],
+    bass: [-24, -24, -12, -24, -24, -24, -12, -24, -26, -26, -14, -26, -26, -26, -14, -26,
+           -21, -21, -9, -21, -21, -21, -9, -21, -19, -19, -7, -19, -17, -17, -17, -17],
+    arp: [0, 4, 7, 12, 16, 12, 7, 4, -2, 2, 5, 10, 14, 10, 5, 2,
+          3, 7, 10, 15, 19, 15, 10, 7, 7, 12, 16, 19, 24, 19, 16, 12],
+    drums: [1, 3, 2, 3, 1, 1, 2, 3, 1, 3, 2, 3, 1, 1, 2, 3,
+            1, 3, 2, 3, 1, 1, 2, 3, 1, 2, 1, 2, 1, 2, 1, 2],
   },
 };
 
@@ -190,6 +220,53 @@ export function playBgm(name: keyof typeof SONGS | null) {
       osc.connect(g).connect(bgmGain);
       osc.start(t0);
       osc.stop(t0 + stepDur);
+    }
+    // アルペジオ(きらびやかな上モノ)
+    if (song.arp) {
+      const a = song.arp[step % song.arp.length];
+      if (a !== null) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.value = N(a + 12);
+        g.gain.setValueAtTime(0.05, t0);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + stepDur * 0.55);
+        osc.connect(g).connect(bgmGain);
+        osc.start(t0);
+        osc.stop(t0 + stepDur * 0.6);
+      }
+    }
+    // ドラム(キック/スネア/ハイハット)
+    if (song.drums) {
+      const d = song.drums[step % song.drums.length];
+      if (d === 1) {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(140, t0);
+        osc.frequency.exponentialRampToValueAtTime(45, t0 + 0.12);
+        g.gain.setValueAtTime(0.4, t0);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+        osc.connect(g).connect(bgmGain);
+        osc.start(t0); osc.stop(t0 + 0.18);
+      } else if (d === 2 || d === 3) {
+        const dur = d === 2 ? 0.13 : 0.045;
+        const vol = d === 2 ? 0.22 : 0.1;
+        const len = Math.floor(ctx.sampleRate * dur);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const f = ctx.createBiquadFilter();
+        f.type = 'highpass';
+        f.frequency.value = d === 2 ? 1200 : 6000;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vol, t0);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+        src.connect(f).connect(g).connect(bgmGain);
+        src.start(t0);
+      }
     }
     step = (step + 1) % song.lead.length;
   };
