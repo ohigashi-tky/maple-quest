@@ -420,6 +420,13 @@ export function loadSave(): SaveData {
   return defaultSave();
 }
 
+// Lv1からやり直す(全進行をリセット)
+export function resetSave(): SaveData {
+  const d = defaultSave();
+  writeSave(d);
+  return d;
+}
+
 export function writeSave(s: SaveData) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }

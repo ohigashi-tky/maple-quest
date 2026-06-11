@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { VIEW_W, VIEW_H } from '../main';
-import { initAudio, playBgm, sfx } from '../audio';
-import { loadSave, writeSave, newProgress, CHARACTERS, tierFor, type CharKey } from '../data';
+import { VIEW_W, VIEW_H, SAFE_TOP } from '../main';
+import { initAudio, playBgm, sfx, setMuted, isMuted } from '../audio';
+import { loadSave, writeSave, resetSave, newProgress, CHARACTERS, tierFor, type CharKey } from '../data';
 import { openFloorSelect } from '../ui/FloorSelect';
 
 export default class TitleScene extends Phaser.Scene {
@@ -97,11 +97,92 @@ export default class TitleScene extends Phaser.Scene {
       openFloorSelect(this, loadSave(), 0, (f, d) => this.start(f, d));
     });
 
+    // Lv1からやり直す(確認あり・小さめ)
+    this.makeSmallButton(cx, VIEW_H - 196, 'Lv1からやり直す', 0x9a3a4a, () => this.confirmReset());
+
     this.add.text(cx, VIEW_H - 14, 'レベルは記憶され(最大Lv999)、自分の強さで何階まで登れるか挑戦!', {
       fontFamily: 'sans-serif', fontSize: '14px', color: '#5a4a3a',
     }).setOrigin(0.5, 1);
 
+    // 音量切り替えアイコン(右上・セーフエリア考慮)
+    this.buildSoundToggle();
+
     this.input.once('pointerdown', () => { initAudio(); playBgm('title'); });
+  }
+
+  // 右上の音量アイコン(タップでミュート切替。未初期化なら初期化)
+  private buildSoundToggle() {
+    const x = VIEW_W - 34, y = 36 + SAFE_TOP;
+    const c = this.add.container(x, y).setDepth(60);
+    const g = this.add.graphics();
+    const render = (pressed: boolean) => {
+      g.clear();
+      g.fillStyle(0x2a2440, pressed ? 1 : 0.82);
+      g.fillCircle(0, 0, 22);
+      g.lineStyle(2, 0x8a7ac4, 0.9);
+      g.strokeCircle(0, 0, 22);
+      g.fillStyle(0xffffff, 1);
+      g.fillRect(-10, -5, 5, 10);
+      g.fillTriangle(-5, -8, -5, 8, 5, 0);
+      if (isMuted()) {
+        g.lineStyle(3, 0xff5a5a, 1);
+        g.lineBetween(-2, -8, 11, 8);
+      } else {
+        g.lineStyle(2, 0xffffff, 0.9);
+        g.beginPath(); g.arc(5, 0, 7, -0.8, 0.8); g.strokePath();
+        g.beginPath(); g.arc(5, 0, 10, -0.7, 0.7); g.strokePath();
+      }
+    };
+    render(false);
+    c.add(g);
+    c.setSize(48, 48).setInteractive({ useHandCursor: true });
+    c.on('pointerdown', () => {
+      initAudio();
+      setMuted(!isMuted());
+      sfx('select');
+      render(true);
+      this.time.delayedCall(130, () => render(false));
+    });
+  }
+
+  // 小さめのボタン
+  private makeSmallButton(x: number, y: number, label: string, color: number, onTap: () => void) {
+    const w = 240, h = 50;
+    const c = this.add.container(x, y);
+    const g = this.add.graphics();
+    const col = Phaser.Display.Color.IntegerToColor(color);
+    g.fillStyle(col.clone().darken(34).color, 0.95);
+    g.fillRoundedRect(-w / 2, -h / 2 + 3, w, h, 12);
+    g.fillStyle(color, 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, 12);
+    const t = this.add.text(0, 0, label, {
+      fontFamily: 'sans-serif', fontSize: '19px', fontStyle: 'bold', color: '#ffffff', stroke: '#2a1a30', strokeThickness: 3,
+    }).setOrigin(0.5).setResolution(2);
+    c.add([g, t]);
+    c.setSize(w, h).setInteractive({ useHandCursor: true });
+    c.on('pointerdown', () => { initAudio(); sfx('select'); this.tweens.add({ targets: c, scale: 0.94, duration: 70, yoyo: true, onComplete: onTap }); });
+    return c;
+  }
+
+  // Lv1リセットの確認ダイアログ
+  private confirmReset() {
+    const cy = VIEW_H / 2;
+    const c = this.add.container(0, 0).setDepth(200);
+    const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x05030a, 0.78).setInteractive();
+    const t = this.add.text(VIEW_W / 2, cy - 90, 'Lv1からやり直しますか?', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '26px', color: '#ffd8d8', stroke: '#3d0a0a', strokeThickness: 6,
+    }).setOrigin(0.5).setResolution(2);
+    const warn = this.add.text(VIEW_W / 2, cy - 36, 'レベル・到達階層・難易度の解放が\nすべてリセットされます(取り消せません)', {
+      fontFamily: 'sans-serif', fontSize: '17px', color: '#ffffff', align: 'center', lineSpacing: 6,
+    }).setOrigin(0.5).setResolution(2);
+    c.add([dim, t, warn]);
+    c.add(this.makeSmallButton(VIEW_W / 2, cy + 50, 'はい、やり直す', 0x9a3a4a, () => {
+      resetSave();
+      sfx('select');
+      c.destroy();
+      this.scene.restart();
+    }));
+    c.add(this.makeSmallButton(VIEW_W / 2, cy + 118, 'キャンセル', 0x6a6a8a, () => c.destroy()));
   }
 
   private makeClassToggle(x: number, y: number, key: CharKey, label: string, sub: string, color: number, onTap: (k: CharKey) => void) {

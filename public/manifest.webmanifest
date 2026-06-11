@@ -1,7 +1,7 @@
 {
-  "name": "無限ボス道場 - メイプル風ボスラッシュ",
+  "name": "無限ボス道場",
   "short_name": "無限ボス道場",
-  "description": "可愛い2Dドット絵の横スクロールアクションRPG。スマホ縦画面に最適化。",
+  "description": "20階のボスに挑む2Dドット絵アクション。スマホ縦画面・オフライン対応。",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
