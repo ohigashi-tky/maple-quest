@@ -1555,6 +1555,73 @@ const A_CLOWN: SpriteDef = {
   ],
 };
 
+// titan: 無限ボス用の巨大コロッサス(角・光る目・胸のコア・巨大な拳)
+const A_TITAN: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      '......oo..........oo......',
+      '.....oddo........oddo.....',
+      '....oddo..oooooo..oddo....',
+      '....oddoodbbbbbdoodddo....',
+      '.....oodbbbbbbbbdoo.......',
+      '......obbwwkbbkwwbbo......',
+      '......obbwkbbbbkwbbo......',
+      '......obbbbbbbbbbbbo......',
+      '......obbdwwwwwwdbbo......',
+      '.....oobbbbbbbbbbbboo.....',
+      '....obbbbbbbbbbbbbbbbo....',
+      '...obdbbbbbbbbbbbbbbdbo...',
+      '..obbbbbbbwwwwwwbbbbbbbo..',
+      '.obbbbbbbwwddddwwbbbbbbbo.',
+      'obbdbbbbbwwddddwwbbbbbdbbo',
+      'obbbbbbbbbwwwwwwbbbbbbbbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbbbo',
+      '.obbbbbbbbbbbbbbbbbbbbbbo.',
+      'obbo.obbbbbbbbbbbbbbo.obbo',
+      'obbbo.obbbbbbbbbbbbo.obbbo',
+      'obbbo.obbbbbbbbbbbo.obbbbo',
+      'obbo..obbbo....obbo..obbo.',
+      'oooo..obbo......obbo.oooo.',
+      '......obbo......obbo......',
+      '......obo........obo......',
+      '.....obbo........obbo.....',
+      '.....ooo..........ooo.....',
+    ],
+    [
+      '......oo..........oo......',
+      '.....oddo........oddo.....',
+      '....oddo..oooooo..oddo....',
+      '....oddoodbbbbbdoodddo....',
+      '.....oodbbbbbbbbdoo.......',
+      '......obbwwkbbkwwbbo......',
+      '......obbwkbbbbkwbbo......',
+      '......obbbbbbbbbbbbo......',
+      '......obbdwwwwwwdbbo......',
+      '.....oobbbbbbbbbbbboo.....',
+      '....obbbbbbbbbbbbbbbbo....',
+      '...obdbbbbbbbbbbbbbbdbo...',
+      '..obbbbbbbwwwwwwbbbbbbbo..',
+      '.obbbbbbbwwwwwwwwbbbbbbbo.',
+      'obbdbbbbbwwwwwwwwbbbbbdbbo',
+      'obbbbbbbbbwwwwwwbbbbbbbbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbbbo',
+      'obbbbbbbbbbbbbbbbbbbbbbbbo',
+      '.obbbbbbbbbbbbbbbbbbbbbbo.',
+      '.obbo.obbbbbbbbbbbbo.obbo.',
+      '..obbo.obbbbbbbbbbo.obbo..',
+      '..obbo.obbbbbbbbbo.obbbo..',
+      '...obbo.obbbo.obbo.obbo...',
+      '...oooo.obbo...obbo.ooo...',
+      '.......obbo....obbo.......',
+      '.......obo......obo.......',
+      '......obbo......obbo......',
+      '......ooo........ooo......',
+    ],
+  ],
+};
+
 // mush: 巨大キノコ(マッシュモム/ブルーマッシュモム)
 const A_MUSH: SpriteDef = {
   palette: ARCH_PAL,
@@ -1619,6 +1686,7 @@ const SPRITES: Record<string, SpriteDef> = {
   boss_witch: A_WITCH,
   boss_clown: A_CLOWN,
   boss_lord: A_LORD,
+  boss_titan: A_TITAN,
   fx_slash: SLASH,
   fx_claw: CLAW,
   fx_fire: FIREBALL,
@@ -1882,7 +1950,7 @@ export function createAllAnims(scene: Phaser.Scene) {
     mk(`${who}_attack`, who, [3], 1, 0);
   }
   // ボスアーキタイプの待機(浮遊・揺れ)アニメ
-  for (const a of ['boss_mush', 'boss_demon', 'boss_drake', 'boss_golem', 'boss_beast', 'boss_knight', 'boss_witch', 'boss_clown', 'boss_lord']) {
+  for (const a of ['boss_mush', 'boss_demon', 'boss_drake', 'boss_golem', 'boss_beast', 'boss_knight', 'boss_witch', 'boss_clown', 'boss_lord', 'boss_titan']) {
     mk(`${a}_move`, a, [0, 1], 3);
   }
   mk('mushmom_move', 'mushmom', [0, 1], 3);

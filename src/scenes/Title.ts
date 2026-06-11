@@ -76,17 +76,19 @@ export default class TitleScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '18px', color: '#cfe0ff',
     }).setOrigin(0.5).setResolution(2);
 
-    // 戦士で挑戦(1階 EASY から)。ゲーム内で魔法使いに交代可能
+    // 無限ボス(1分間の最大ダメージ計測)
     this.selectedClass = 'warrior';
-    this.makeButton(cx, VIEW_H - 470, '挑 戦', '戦士で第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
+    this.makeButton(cx, VIEW_H - 552, '無限ボス', '1分間の最大ダメージに挑戦', 0xc24aa8, () => this.startInfinite());
+    // 戦士で挑戦(1階 EASY から)。ゲーム内で魔法使いに交代可能
+    this.makeButton(cx, VIEW_H - 464, '挑 戦', '戦士で第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
     // 階層をえらぶ(難易度・到達階層から)
-    this.makeButton(cx, VIEW_H - 382, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
+    this.makeButton(cx, VIEW_H - 376, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
       initAudio();
       openFloorSelect(this, loadSave(), 0, (f, d) => this.start(f, d));
     });
 
     // Lv1からやり直す(確認あり・小さめ。誤タップ防止に十分な余白を上に)
-    this.makeSmallButton(cx, VIEW_H - 250, 'Lv1からやり直す', 0x9a3a4a, () => this.confirmReset());
+    this.makeSmallButton(cx, VIEW_H - 248, 'Lv1からやり直す', 0x9a3a4a, () => this.confirmReset());
 
     // 音量切り替えアイコン(右上・セーフエリア考慮)
     this.buildSoundToggle();
@@ -228,6 +230,19 @@ export default class TitleScene extends Phaser.Scene {
     this.cameras.main.fadeOut(350, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start('Game', { floor, difficulty });
+      this.scene.launch('Hud');
+    });
+  }
+
+  // 無限ボス(1分間の最大ダメージ計測)。今のレベル/ジョブで挑む
+  private startInfinite() {
+    const save = loadSave();
+    save.charKey = this.selectedClass;
+    writeSave(save);
+    this.registry.set('progress', newProgress(save, 1, 0));
+    this.cameras.main.fadeOut(350, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('Game', { infinite: true });
       this.scene.launch('Hud');
     });
   }

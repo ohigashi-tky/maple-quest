@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { VIEW_W, VIEW_H, SAFE_TOP } from '../main';
 import { sfx, setMuted, isMuted, stopBgm } from '../audio';
-import { fmt, DIFFICULTIES, loadSave } from '../data';
+import { fmt, fmtBig, DIFFICULTIES, loadSave } from '../data';
 import { openFloorSelect } from '../ui/FloorSelect';
 import type GameScene from './Game';
 
@@ -39,6 +39,11 @@ export default class HudScene extends Phaser.Scene {
   private killText!: Phaser.GameObjects.Text;
   private bossG!: Phaser.GameObjects.Graphics;
   private bossText!: Phaser.GameObjects.Text;
+  // 無限ボスモード表示
+  private infGaugeText!: Phaser.GameObjects.Text;   // 何ゲージ目か
+  private infHpText!: Phaser.GameObjects.Text;       // 現在HP/ゲージHP
+  private infTimerText!: Phaser.GameObjects.Text;    // 残り秒
+  private infTotalText!: Phaser.GameObjects.Text;    // 累計ダメージ
 
   private skillBtns: Btn[] = [];
   private potionHpBtn!: Btn; // エリクサーボタン
@@ -150,12 +155,50 @@ export default class HudScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '16px', fontStyle: 'bold',
       color: '#ffd8e2', stroke: '#5c1a2d', strokeThickness: 4,
     }).setOrigin(0.5).setResolution(2);
+    // 無限ボス: ゲージ番号(バー右)/現在HP(バー下)/タイマー・累計(中央上)
+    this.infGaugeText = this.add.text(0, 0, '', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#ffd24a', stroke: '#5c2a1a', strokeThickness: 3,
+    }).setOrigin(0, 0.5).setResolution(2).setVisible(false);
+    this.infHpText = this.add.text(0, 0, '', {
+      fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold', color: '#ffffff', stroke: '#3a1020', strokeThickness: 3,
+    }).setOrigin(0.5).setResolution(2).setVisible(false);
+    this.infTimerText = this.add.text(VIEW_W / 2, 96 + SAFE_TOP, '', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '22px', color: '#ffffff', stroke: '#2a1a44', strokeThickness: 5,
+    }).setOrigin(0.5).setResolution(2).setVisible(false);
+    this.infTotalText = this.add.text(VIEW_W / 2, 118 + SAFE_TOP, '', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '17px', color: '#ffe45a', stroke: '#7a3a1a', strokeThickness: 4,
+    }).setOrigin(0.5).setResolution(2).setVisible(false);
   }
 
   private drawBossBar() {
     const ui = this.game_.uiState;
     const g = this.bossG;
     g.clear();
+
+    // 無限ボスモード: ゲージ(2倍化HP)+番号+数値+タイマー+累計ダメージ
+    if (ui?.infinite) {
+      const w = 300, x = (VIEW_W - w) / 2, y = 150 + SAFE_TOP;
+      this.bossText.setText('無 限 ボ ス');
+      g.fillStyle(0x1a1430, 0.85);
+      g.fillRoundedRect(x - 4, y - 4, w + 8, 24, 10);
+      g.fillStyle(0x241038, 1);
+      g.fillRoundedRect(x, y, w, 16, 8);
+      g.fillStyle(0xc24aff, 1);
+      const hw = Math.max(0, (ui.infMax > 0 ? ui.infHp / ui.infMax : 0) * (w - 2));
+      if (hw > 1) g.fillRoundedRect(x + 1, y + 1, hw, 14, 7);
+      g.lineStyle(2, 0xe0a0ff, 0.9);
+      g.strokeRoundedRect(x, y, w, 16, 8);
+      // ゲージ番号(バー右)
+      this.infGaugeText.setVisible(true).setPosition(x + w + 8, y + 8).setText(`${fmtBig(ui.infGauge)} ゲージ目`);
+      // 現在HP/ゲージHP(バー下)
+      this.infHpText.setVisible(true).setPosition(VIEW_W / 2, y + 30).setText(`${fmtBig(ui.infHp)} / ${fmtBig(ui.infMax)}`);
+      // タイマー & 累計ダメージ
+      this.infTimerText.setVisible(true).setText(`残り ${ui.infTimeLeft} 秒`).setColor(ui.infTimeLeft <= 10 ? '#ff8a8a' : '#ffffff');
+      this.infTotalText.setVisible(true).setText(`累計ダメージ ${fmtBig(ui.infTotal)}`);
+      return;
+    }
+    if (this.infGaugeText.visible) { this.infGaugeText.setVisible(false); this.infHpText.setVisible(false); this.infTimerText.setVisible(false); this.infTotalText.setVisible(false); }
+
     if (!ui?.boss) {
       this.bossText.setText('');
       return;
@@ -553,6 +596,41 @@ export default class HudScene extends Phaser.Scene {
     this.overlay = c;
   }
 
+  // 無限ボスの結果(1分間の累積ダメージ)
+  showInfiniteResult(r: { total: number; maxHit: number; gauge: number; level: number; job: string }) {
+    this.clearOverlay();
+    sfx('levelup');
+    const cy = VIEW_H / 2;
+    const c = this.add.container(0, 0).setDepth(100);
+    const dim = this.add.rectangle(VIEW_W / 2, cy, VIEW_W, VIEW_H, 0x0a0420, 0.85).setInteractive();
+    const title = this.add.text(VIEW_W / 2, cy - 210, 'TIME UP!', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '50px', color: '#ff9ad8', stroke: '#5c1a3d', strokeThickness: 10,
+    }).setOrigin(0.5).setResolution(2);
+    this.add.existing(title);
+    const lab = this.add.text(VIEW_W / 2, cy - 140, '1分間の累積ダメージ', {
+      fontFamily: 'sans-serif', fontSize: '20px', color: '#ffffff',
+    }).setOrigin(0.5).setResolution(2);
+    const total = this.add.text(VIEW_W / 2, cy - 92, fmtBig(r.total), {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '54px', color: '#ffe45a', stroke: '#7a3a1a', strokeThickness: 9,
+    }).setOrigin(0.5).setResolution(2);
+    const exact = this.add.text(VIEW_W / 2, cy - 50, `(${fmt(r.total)})`, {
+      fontFamily: 'sans-serif', fontSize: '15px', color: '#cfe0ff',
+    }).setOrigin(0.5).setResolution(2);
+    const detail = this.add.text(VIEW_W / 2, cy + 24,
+      `最大の一撃: ${fmtBig(r.maxHit)}\n到達ゲージ: ${fmtBig(r.gauge)} ゲージ目\nLv.${r.level} ${r.job}`, {
+        fontFamily: 'sans-serif', fontSize: '20px', color: '#cfe0ff', align: 'center', lineSpacing: 9,
+      }).setOrigin(0.5).setResolution(2);
+    total.setScale(0.4);
+    this.tweens.add({ targets: total, scale: 1, duration: 350, ease: 'Back.easeOut' });
+    c.add([dim, title, lab, total, exact, detail]);
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 130, 'もう一度', 0xff8a2a, () => {
+      this.clearOverlay();
+      (this.scene.get('Game') as GameScene).scene.restart({ infinite: true });
+    }));
+    c.add(this.makeOverlayButton(VIEW_W / 2, cy + 214, 'タイトルへもどる', 0x6a6a8a, () => this.toTitle()));
+    this.overlay = c;
+  }
+
   private makeOverlayButton(x: number, y: number, label: string, color: number, onTap: () => void) {
     const c = this.add.container(x, y);
     const g = this.add.graphics();
@@ -604,9 +682,15 @@ export default class HudScene extends Phaser.Scene {
 
     this.drawBars();
     this.drawBossBar();
-    this.stageText.setText(`第 ${ui.floor} 階 / ${ui.total}`);
-    this.killText.setText(`${ui.floorName}  [${DIFFICULTIES[ui.difficulty].name}]`);
-    this.killText.setColor(ui.underLeveled ? '#ff8a8a' : '#dcd2ff');
+    if (ui.infinite) {
+      this.stageText.setText('無限ボス');
+      this.killText.setText('最大ダメージ計測');
+      this.killText.setColor('#ff9ad8');
+    } else {
+      this.stageText.setText(`第 ${ui.floor} 階 / ${ui.total}`);
+      this.killText.setText(`${ui.floorName}  [${DIFFICULTIES[ui.difficulty].name}]`);
+      this.killText.setColor(ui.underLeveled ? '#ff8a8a' : '#dcd2ff');
+    }
 
     ui.skills.forEach((s, i) => {
       const btn = this.skillBtns[i];

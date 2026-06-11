@@ -2,9 +2,10 @@ import Phaser from 'phaser';
 import {
   CHARACTERS, FLOORS, TOTAL_FLOORS, GROUND_Y, WORLD_H, ARENA_W,
   expForLevel, newProgress, tierFor, tierIndexFor,
-  atkScale, hpScale, mpScale, critRate, critMul, fmt, ELIXIR_MAX, LEVEL_CAP, REGEN_PCT_PER_SEC,
+  atkScale, hpScale, mpScale, critRate, critMul, fmt, fmtBig, ELIXIR_MAX, LEVEL_CAP, REGEN_PCT_PER_SEC,
   bossHp, bossAtk, bossExp, playerHitChance, playerDamageScale, enemyDamageScale, effReq,
   loadSave, writeSave, themeTile, DIFFICULTIES,
+  INFINITE_TIME, gaugeMax,
   type CharKey, type Progress, type FloorDef, type JobTier, type SkillDef,
 } from '../data';
 import { sfx, playBgm, stopBgm } from '../audio';
@@ -42,6 +43,13 @@ export interface UiState {
   elixirCdLeft: number;
   otherCharKey: CharKey;
   gameOver: boolean;
+  // 無限ボスモード
+  infinite: boolean;
+  infGauge: number;      // 何ゲージ目か
+  infHp: number;         // 現在ゲージの残りHP
+  infMax: number;        // 現在ゲージの最大HP
+  infTotal: number;      // 累積ダメージ
+  infTimeLeft: number;   // 残り秒
 }
 
 interface BossSprite extends Phaser.Physics.Arcade.Sprite {
@@ -103,7 +111,7 @@ export default class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  init(data: { floor?: number; difficulty?: number }) {
+  init(data: { floor?: number; difficulty?: number; infinite?: boolean }) {
     this.facing = 1;
     this.attackCdAt = 0;
     this.skillCdAt = [0, 0, 0];
@@ -117,9 +125,13 @@ export default class GameScene extends Phaser.Scene {
     this.bossActive = false;
     this._initFloor = data.floor;
     this._initDiff = data.difficulty;
+    this.infinite = !!data.infinite;
+    this.inf = { gauge: 1, hp: 0, total: 0, maxHit: 0, endAt: 0 };
   }
   private _initFloor?: number;
   private _initDiff?: number;
+  private infinite = false;
+  private inf = { gauge: 1, hp: 0, total: 0, maxHit: 0, endAt: 0 };
 
   create() {
     this.progress = this.registry.get('progress') as Progress;
@@ -127,10 +139,16 @@ export default class GameScene extends Phaser.Scene {
       this.progress = newProgress(loadSave());
       this.registry.set('progress', this.progress);
     }
-    if (this._initFloor !== undefined) this.progress.floor = this._initFloor;
-    if (this._initDiff !== undefined) this.progress.difficulty = this._initDiff;
-    this.floorIdx = Phaser.Math.Clamp(this.progress.floor - 1, 0, TOTAL_FLOORS - 1);
-    this.floor = FLOORS[this.floorIdx];
+    if (this.infinite) {
+      // 無限ボス: 虚無テーマの舞台で巨大ボスを延々と殴る計測モード
+      this.floorIdx = TOTAL_FLOORS - 1;
+      this.floor = FLOORS[this.floorIdx]; // void テーマ
+    } else {
+      if (this._initFloor !== undefined) this.progress.floor = this._initFloor;
+      if (this._initDiff !== undefined) this.progress.difficulty = this._initDiff;
+      this.floorIdx = Phaser.Math.Clamp(this.progress.floor - 1, 0, TOTAL_FLOORS - 1);
+      this.floor = FLOORS[this.floorIdx];
+    }
 
     this.buildBackground();
     this.buildPlatforms();
@@ -141,23 +159,30 @@ export default class GameScene extends Phaser.Scene {
     this.buildKeyboard();
     this.buildUiState();
 
-    // 中ボスはかっこいい戦闘曲、5層ごとの強敵はより激しいエピック曲
-    playBgm(this.floor.major ? 'epic' : 'battle');
     this.cameras.main.fadeIn(400, 0, 0, 0);
 
-    // 階層イントロ → ボス出現
-    this.time.delayedCall(200, () => {
-      const diffName = DIFFICULTIES[this.progress.difficulty].name;
-      this.hud()?.showBanner(
-        `第 ${this.floor.floor} 階 [${diffName}]\n${this.floor.title}「${this.floor.bossName}」`,
-        this.floor.major ? '#ff7a7a' : '#ffe9b0'
-      );
-      // 格上には数値を出さず注意のみ
-      if (this.progress.level < this.er(this.floor) - 4) {
-        this.time.delayedCall(1500, () => this.hud()?.showBanner('強敵! 油断するな', '#ff8a8a'));
-      }
-    });
-    this.time.delayedCall(1100, () => this.spawnBoss());
+    if (this.infinite) {
+      playBgm('epic');
+      this.inf.endAt = this.time.now + INFINITE_TIME * 1000;
+      this.inf.gauge = 1;
+      this.inf.hp = gaugeMax(1);
+      this.time.delayedCall(150, () => this.hud()?.showBanner('無限ボス\n1分間の最大ダメージに挑戦!', '#ff9ad8'));
+      this.time.delayedCall(900, () => this.spawnBoss());
+    } else {
+      // 中ボスはかっこいい戦闘曲、5層ごとの強敵はより激しいエピック曲
+      playBgm(this.floor.major ? 'epic' : 'battle');
+      this.time.delayedCall(200, () => {
+        const diffName = DIFFICULTIES[this.progress.difficulty].name;
+        this.hud()?.showBanner(
+          `第 ${this.floor.floor} 階 [${diffName}]\n${this.floor.title}「${this.floor.bossName}」`,
+          this.floor.major ? '#ff7a7a' : '#ffe9b0'
+        );
+        if (this.progress.level < this.er(this.floor) - 4) {
+          this.time.delayedCall(1500, () => this.hud()?.showBanner('強敵! 油断するな', '#ff8a8a'));
+        }
+      });
+      this.time.delayedCall(1100, () => this.spawnBoss());
+    }
 
     this.events.on('shutdown', () => this.tweens.killAll());
   }
@@ -379,6 +404,12 @@ export default class GameScene extends Phaser.Scene {
       elixirCdLeft: 0,
       otherCharKey: def.key === 'warrior' ? 'mage' : 'warrior',
       gameOver: false,
+      infinite: this.infinite,
+      infGauge: this.inf.gauge,
+      infHp: this.inf.hp,
+      infMax: gaugeMax(this.inf.gauge),
+      infTotal: this.inf.total,
+      infTimeLeft: INFINITE_TIME,
     };
   }
 
@@ -411,6 +442,7 @@ export default class GameScene extends Phaser.Scene {
   // ============================================================
   private spawnBoss() {
     if (this.over) return;
+    if (this.infinite) { this.spawnTitan(); return; }
     const f = this.floor;
     const flying = f.archetype === 'demon' || f.archetype === 'beast';
     const x = ARENA_W * 0.7;
@@ -447,6 +479,55 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(enraged ? 1500 : 2300, pattern);
     };
     this.time.delayedCall(1400, pattern);
+  }
+
+  // 無限ボス: 巨大タイタンを設置(ゲージHP・攻撃は1ダメージ・ほぼ静止)
+  private spawnTitan() {
+    const f = this.floor;
+    const x = ARENA_W * 0.66;
+    const b = this.physics.add.sprite(x, GROUND_Y - 70, 'boss_titan_0') as BossSprite;
+    b.floor = f;
+    b.flying = false;
+    b.atk = 1;            // 攻撃は固定1ダメージ
+    b.maxhp = this.inf.hp;
+    b.hp = this.inf.hp;
+    b.lastHitAt = 0;
+    b.aiTimer = 0;
+    b.touchCd = 0;
+    b.dir = -1;
+    b.setScale(4.2);       // かなり大きめ
+    b.setTint(0x8a3acc);
+    b.play('boss_titan_move');
+    b.setDepth(8);
+    const bw = b.width * 0.5, bh = b.height * 0.8;
+    b.setSize(bw, bh).setOffset((b.width - bw) / 2, b.height - bh);
+    this.physics.add.collider(b, this.platforms);
+    (b as BossSprite & { titan?: boolean }).stunUntil = 0;
+    this.boss = b;
+    this.bossActive = true;
+
+    this.cameras.main.shake(260, 0.003);
+    this.cameras.main.flash(360, 200, 120, 255);
+    sfx('thunder');
+
+    // ゆるい攻撃(1ダメージ・画面揺れほぼ無し)
+    const pattern = () => {
+      if (!b.active || this.over) return;
+      this.titanAction(b);
+      this.time.delayedCall(2400, pattern);
+    };
+    this.time.delayedCall(2000, pattern);
+  }
+
+  // タイタンのゆるい攻撃: 遅い弾を少し撒く(被弾しても1ダメージ・揺れ極小)
+  private titanAction(b: BossSprite) {
+    if (!b.active || this.over) return;
+    const n = 3;
+    const base = Math.atan2(this.player.y - b.y, this.player.x - b.x);
+    for (let i = 0; i < n; i++) {
+      const ang = base + (i - (n - 1) / 2) * 0.4;
+      this.eShot(b, b.x, b.y - 10, 'fx_orb_0', Math.cos(ang) * 70, Math.sin(ang) * 70, 1.4, 4000);
+    }
   }
 
   private bossAction(b: BossSprite) {
@@ -1155,32 +1236,61 @@ export default class GameScene extends Phaser.Scene {
   // 多段ヒット + MISS判定 + レベル差補正
   private hitEnemy(e: BossSprite, mult: number, hits: number) {
     if (!e.active || e.dying) return;
-    const hitChance = playerHitChance(this.progress.level, this.er(e.floor));
-    const dmgScale = playerDamageScale(this.progress.level, this.er(e.floor));
+    // 無限ボス: MISSなし・格上補正なし(自分の素の火力を計測)
+    const hitChance = this.infinite ? 1 : playerHitChance(this.progress.level, this.er(e.floor));
+    const dmgScale = this.infinite ? 1 : playerDamageScale(this.progress.level, this.er(e.floor));
     for (let i = 0; i < Math.max(1, hits); i++) {
       this.time.delayedCall(i * 75, () => {
         if (!e.active || e.dying) return;
-        // MISS判定(格上だと外れやすい)
-        if (Math.random() > hitChance) {
-          this.missNumber(e);
-          return;
-        }
+        if (Math.random() > hitChance) { this.missNumber(e); return; }
         const crit = Math.random() < critRate(this.progress.level);
         const frozen = e.frozenUntil && this.time.now < e.frozenUntil ? 1.3 : 1;
         const dmg = Math.max(1, Math.floor(
           this.atk() * mult * dmgScale * Phaser.Math.FloatBetween(0.92, 1.08) * (crit ? critMul(this.progress.level) : 1) * frozen
         ));
-        e.hp -= dmg;
         e.lastHitAt = this.time.now;
         sfx(crit ? 'crit' : 'hit');
         this.damageNumber(e, dmg, crit);
         const star = this.add.image(e.x, e.y - 6, 'fx_star_0').setDepth(13).setScale(crit ? 1.6 : 1.0);
         this.tweens.add({ targets: star, alpha: 0, scale: 0.3, angle: 90, duration: 240, onComplete: () => star.destroy() });
         e.setTintFill(crit ? 0xffe45a : 0xffffff);
+        const titanTint = this.infinite ? 0x8a3acc : e.floor.tint;
         const frozenNow = e.frozenUntil && this.time.now < e.frozenUntil;
-        this.time.delayedCall(70, () => e.active && (frozenNow ? e.setTint(0x9ad8ff) : e.setTint(e.floor.tint)));
-        if (e.hp <= 0) this.killBoss(e);
+        this.time.delayedCall(70, () => e.active && (frozenNow ? e.setTint(0x9ad8ff) : e.setTint(titanTint)));
+
+        if (this.infinite) {
+          this.applyInfiniteDamage(e, dmg);
+        } else {
+          e.hp -= dmg;
+          if (e.hp <= 0) this.killBoss(e);
+        }
       });
+    }
+  }
+
+  // 無限ボス: 累積ダメージとゲージ進行(ゲージを超えた分は次段階へ持ち越し、必要なら一気に飛ばす)
+  private applyInfiniteDamage(e: BossSprite, dmg: number) {
+    this.inf.total += dmg;
+    this.inf.maxHit = Math.max(this.inf.maxHit, dmg);
+    let d = dmg;
+    let broke = false;
+    // 残HPを超えるダメージはゲージを割って次段階へ
+    while (d >= this.inf.hp && this.inf.gauge < 1000) {
+      d -= this.inf.hp;
+      this.inf.gauge += 1;
+      this.inf.hp = gaugeMax(this.inf.gauge);
+      broke = true;
+    }
+    this.inf.hp -= d;
+    e.hp = this.inf.hp;
+    e.maxhp = gaugeMax(this.inf.gauge);
+    if (broke) {
+      // ゲージ突破の演出
+      this.cameras.main.flash(120, 255, 200, 120);
+      const t = this.add.text(e.x, e.y - e.displayHeight / 2 - 24, `${this.inf.gauge} ゲージ目!`, {
+        fontFamily: '"Arial Black", sans-serif', fontSize: '12px', color: '#ffd24a', stroke: '#7a2a2a', strokeThickness: 4,
+      }).setOrigin(0.5).setDepth(22).setResolution(4);
+      this.tweens.add({ targets: t, y: t.y - 20, alpha: 0, duration: 900, onComplete: () => t.destroy() });
     }
   }
 
@@ -1300,6 +1410,17 @@ export default class GameScene extends Phaser.Scene {
     if (this.over || this.transitioning) return;
     const now = this.time.now;
     if (now < this.invulnUntil) return;
+
+    // 無限ボス: 被ダメージは固定1・画面揺れ極小・倒れない(計測に集中)
+    if (this.infinite) {
+      this.invulnUntil = now + 500;
+      this.charState.hp = Math.max(1, this.charState.hp - 1);
+      this.floatText(this.player.x, this.player.y - 28, '1', '#ff8a8a');
+      this.player.setTintFill(0xff9a9a);
+      this.time.delayedCall(90, () => this.player.clearTint());
+      return;
+    }
+
     this.invulnUntil = now + 900;
     const buff = this.buffs[this.progress.charKey];
     const defMul = now < buff.until ? buff.def : 1;
@@ -1420,13 +1541,29 @@ export default class GameScene extends Phaser.Scene {
   // ============================================================
   update(_time: number, delta: number) {
     if (this.over || this.transitioning) { this.syncUiState(); return; }
+    if (this.infinite && this.time.now >= this.inf.endAt) { this.endInfinite(); this.syncUiState(); return; }
     this.updateRegen(delta);
     this.updatePlayerMove();
     this.updateBoss();
     this.updateShots();
     this.updatePickups();
-    this.updatePortal();
     this.syncUiState();
+  }
+
+  // 無限ボス終了 → 結果表示
+  private endInfinite() {
+    if (this.over) return;
+    this.over = true;
+    stopBgm();
+    sfx('levelup');
+    this.physics.pause();
+    this.hud()?.showInfiniteResult({
+      total: this.inf.total,
+      maxHit: this.inf.maxHit,
+      gauge: this.inf.gauge,
+      level: this.progress.level,
+      job: this.jobTier.jobName,
+    });
   }
 
   // 自然回復: 戦士はHP、魔法使いはMPを毎秒わずかに回復
@@ -1504,7 +1641,15 @@ export default class GameScene extends Phaser.Scene {
       this.drawBossHpBar(b, now);
       return;
     } else if (b.frozenUntil && now >= b.frozenUntil) {
-      b.frozenUntil = 0; b.setTint(b.floor.tint);
+      b.frozenUntil = 0; b.setTint(this.infinite ? 0x8a3acc : b.floor.tint);
+    }
+
+    // 無限ボス: タイタンはほぼ静止(殴られ続ける用)。プレイヤーをゆっくり向くだけ
+    if (this.infinite) {
+      b.setFlipX((this.player.x - b.x) < 0);
+      body.setVelocityX(0);
+      this.drawBossHpBar(b, now);
+      return;
     }
 
     const enraged = b.hp < b.maxhp * 0.5;
@@ -1655,5 +1800,12 @@ export default class GameScene extends Phaser.Scene {
     ui.switchCdLeft = Math.max(0, this.switchCdAt - now);
     ui.otherCharKey = def.key === 'warrior' ? 'mage' : 'warrior';
     ui.gameOver = this.over;
+    // 無限ボスモード
+    ui.infinite = this.infinite;
+    ui.infGauge = this.inf.gauge;
+    ui.infHp = Math.max(0, this.inf.hp);
+    ui.infMax = gaugeMax(this.inf.gauge);
+    ui.infTotal = this.inf.total;
+    ui.infTimeLeft = this.infinite ? Math.max(0, Math.ceil((this.inf.endAt - now) / 1000)) : 0;
   }
 }

@@ -458,3 +458,28 @@ export function newProgress(save: SaveData, floor = 1, difficulty = 0): Progress
 export function fmt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
+
+// 大きい数値を 万/億/兆/京 単位で読みやすく表示
+export function fmtBig(n: number): string {
+  if (n < 10000) return Math.round(n).toLocaleString('en-US');
+  const units: [number, string][] = [[1e16, '京'], [1e12, '兆'], [1e8, '億'], [1e4, '万']];
+  for (const [v, u] of units) {
+    if (n >= v) {
+      const x = n / v;
+      return (x >= 100 ? Math.round(x).toLocaleString('en-US') : x.toFixed(1).replace(/\.0$/, '')) + u;
+    }
+  }
+  return Math.round(n).toLocaleString('en-US');
+}
+
+// ============================================================
+// 無限ボスモード(1分間の累積ダメージ計測)
+// ============================================================
+export const INFINITE_TIME = 60;       // 秒
+export const INFINITE_BASE_HP = 1000;  // 1ゲージ目のHP
+export const INFINITE_MAX_GAUGE = 1000;
+
+// Gゲージ目のHP上限(ゲージごとに2倍。1000まで=ほぼ無限)
+export function gaugeMax(g: number): number {
+  return INFINITE_BASE_HP * Math.pow(2, Math.min(g, INFINITE_MAX_GAUGE) - 1);
+}
