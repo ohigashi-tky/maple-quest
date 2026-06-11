@@ -294,11 +294,14 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.existing(ground, true);
     this.platforms.add(ground as unknown as Phaser.Physics.Arcade.Sprite);
 
-    // 道場のシンプルな足場2段
+    // ジャンプで届く高さの足場(ジャンプ到達は約55〜60px)
+    // 低段(地面から直接届く) y=GROUND_Y-44、中段は低段から跳んで届く位置に
+    const lowY = GROUND_Y - 44;   // 388
+    const midY = GROUND_Y - 92;   // 340: 低段の上から届く
     const plats = [
-      { x: 110, y: 360, w: 120 },
-      { x: ARENA_W - 230, y: 360, w: 120 },
-      { x: ARENA_W / 2 - 60, y: 300, w: 120 },
+      { x: 40, y: lowY, w: 104 },
+      { x: ARENA_W - 144, y: lowY, w: 104 },
+      { x: ARENA_W / 2 - 52, y: midY, w: 104 }, // 中央上段(両脇の低段から跳んで届く)
     ];
     for (const p of plats) {
       const spr = this.add.tileSprite(p.x + p.w / 2, p.y + 6, p.w, 12, tile);
@@ -455,7 +458,10 @@ export default class GameScene extends Phaser.Scene {
       demon: ['fan', 'homing', 'ring', 'dash'],           // 魔神: 火球弾幕・突進
       drake: ['fan', 'rain', 'beam', 'spiral'],           // 竜: ブレス・薙ぎ払い
       beast: ['dash', 'fan', 'spikes', 'volley'],         // 猛獣: 急襲・爪連撃
-      lord: ['bolt', 'orbBurst', 'beam', 'homing', 'spiral'], // 君主: 落雷・弾幕・ビーム
+      knight: ['dash', 'slam', 'volley', 'beam'],         // 騎士: 斬り込み・剣圧・突き
+      witch: ['bolt', 'homing', 'spiral', 'rain'],        // 魔女: 呪詛弾・落雷・血の雨
+      clown: ['ring', 'homing', 'orbBurst', 'spiral'],    // 道化: トランプ弾幕・いたずら弾
+      lord: ['bolt', 'orbBurst', 'beam', 'homing', 'spiral'], // 魔導士: 落雷・弾幕・闇のビーム
     };
     let pool = pools[arch] ?? ['fan'];
     // 強敵(5層ボス)は怒り時に強力な弾幕(spiral)を多用
@@ -1503,7 +1509,7 @@ export default class GameScene extends Phaser.Scene {
     const dashing = Math.abs(body.velocity.x) > 180 || Math.abs(body.velocity.y) > 200;
     const spd = (b.floor.archetype === 'beast' ? 78 : 50) * (enraged ? 1.4 : 1);
     // アーキタイプごとの「保ちたい間合い」(近接ボスは近め、遠隔ボスは遠め)
-    const keep = ({ golem: 46, mush: 50, beast: 40, drake: 96, demon: 100, lord: 116 } as Record<string, number>)[b.floor.archetype] ?? 70;
+    const keep = ({ golem: 46, mush: 50, beast: 40, knight: 44, drake: 96, demon: 100, clown: 104, witch: 120, lord: 124 } as Record<string, number>)[b.floor.archetype] ?? 70;
     const dx = this.player.x - b.x;
     const adx = Math.abs(dx);
     const face = Math.sign(dx) || b.dir || 1;

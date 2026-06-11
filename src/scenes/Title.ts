@@ -45,15 +45,15 @@ export default class TitleScene extends Phaser.Scene {
     this.add.sprite(cx + 160, 360, 'boss_lord_0').setScale(2.2).setTint(0x2a1a3a).play('boss_lord_move').setAlpha(0.9);
 
     // ロゴ
-    const logoShadow = this.add.text(cx + 4, 168, 'MAPLE DOJO', {
-      fontFamily: '"Arial Black", sans-serif', fontSize: '58px', color: '#3a2a5a',
+    const logoShadow = this.add.text(cx + 4, 168, '無限ボス道場', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '52px', fontStyle: 'bold', color: '#3a2a5a',
     }).setOrigin(0.5);
-    const logo = this.add.text(cx, 164, 'MAPLE DOJO', {
-      fontFamily: '"Arial Black", sans-serif', fontSize: '58px', color: '#ffb347',
+    const logo = this.add.text(cx, 164, '無限ボス道場', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '52px', fontStyle: 'bold', color: '#ffb347',
       stroke: '#4a2a5a', strokeThickness: 10,
     }).setOrigin(0.5);
-    this.add.text(cx, 220, '〜 20階の試練 〜', {
-      fontFamily: 'sans-serif', fontSize: '26px', color: '#ffffff', stroke: '#4a2a5a', strokeThickness: 6,
+    this.add.text(cx, 218, '〜 20階のボスに挑め 〜', {
+      fontFamily: 'sans-serif', fontSize: '24px', color: '#ffffff', stroke: '#4a2a5a', strokeThickness: 6,
     }).setOrigin(0.5);
     this.tweens.add({ targets: [logo, logoShadow], y: '-=10', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 

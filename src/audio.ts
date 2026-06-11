@@ -182,6 +182,80 @@ const SONGS: Record<string, Song> = {
 
 let currentSong: string | null = null;
 
+// 1ステップ分の音をオーディオの絶対時刻 t に予約する(先読みスケジューリング)
+function scheduleStep(song: Song, step: number, t: number, stepDur: number) {
+  if (!ctx || !bgmGain) return;
+  const lead = song.lead[step % song.lead.length];
+  const bass = song.bass[step % song.bass.length];
+  if (lead !== null) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = N(lead);
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + stepDur * 0.95);
+    osc.connect(g).connect(bgmGain);
+    osc.start(t);
+    osc.stop(t + stepDur);
+  }
+  if (bass !== null) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = N(bass);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + stepDur * 0.9);
+    osc.connect(g).connect(bgmGain);
+    osc.start(t);
+    osc.stop(t + stepDur);
+  }
+  if (song.arp) {
+    const a = song.arp[step % song.arp.length];
+    if (a !== null) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = N(a + 12);
+      g.gain.setValueAtTime(0.05, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + stepDur * 0.55);
+      osc.connect(g).connect(bgmGain);
+      osc.start(t);
+      osc.stop(t + stepDur * 0.6);
+    }
+  }
+  if (song.drums) {
+    const d = song.drums[step % song.drums.length];
+    if (d === 1) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, t);
+      osc.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      g.gain.setValueAtTime(0.4, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      osc.connect(g).connect(bgmGain);
+      osc.start(t); osc.stop(t + 0.18);
+    } else if (d === 2 || d === 3) {
+      const dur = d === 2 ? 0.13 : 0.045;
+      const vol = d === 2 ? 0.22 : 0.1;
+      const len = Math.floor(ctx.sampleRate * dur);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const f = ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.value = d === 2 ? 1200 : 6000;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(f).connect(g).connect(bgmGain);
+      src.start(t);
+    }
+  }
+}
+
 export function playBgm(name: keyof typeof SONGS | null) {
   if (!ctx || !bgmGain) return;
   if (currentSong === name) return;
@@ -191,87 +265,20 @@ export function playBgm(name: keyof typeof SONGS | null) {
   const song = SONGS[name];
   const stepDur = 60 / song.bpm / 2; // 8分音符
   let step = 0;
-  const playStep = () => {
-    if (!ctx || !bgmGain || muted) {
+  // 先読みスケジューラ: 次の音をオーディオ時計の正確な時刻に前もって予約する。
+  // タイマー(setInterval)が録画などの負荷で多少ズレても、音声自体はサンプル精度で鳴るためガタつかない。
+  let nextTime = ctx.currentTime + 0.06;
+  const LOOKAHEAD = 0.18; // 秒: この先までを予約
+  const tick = () => {
+    if (!ctx) return;
+    while (nextTime < ctx.currentTime + LOOKAHEAD) {
+      if (!muted) scheduleStep(song, step, nextTime, stepDur);
+      nextTime += stepDur;
       step = (step + 1) % song.lead.length;
-      return;
     }
-    const t0 = ctx.currentTime;
-    const lead = song.lead[step % song.lead.length];
-    const bass = song.bass[step % song.bass.length];
-    if (lead !== null) {
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = N(lead);
-      g.gain.setValueAtTime(0.12, t0);
-      g.gain.exponentialRampToValueAtTime(0.001, t0 + stepDur * 0.95);
-      osc.connect(g).connect(bgmGain);
-      osc.start(t0);
-      osc.stop(t0 + stepDur);
-    }
-    if (bass !== null) {
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.value = N(bass);
-      g.gain.setValueAtTime(0.22, t0);
-      g.gain.exponentialRampToValueAtTime(0.001, t0 + stepDur * 0.9);
-      osc.connect(g).connect(bgmGain);
-      osc.start(t0);
-      osc.stop(t0 + stepDur);
-    }
-    // アルペジオ(きらびやかな上モノ)
-    if (song.arp) {
-      const a = song.arp[step % song.arp.length];
-      if (a !== null) {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.value = N(a + 12);
-        g.gain.setValueAtTime(0.05, t0);
-        g.gain.exponentialRampToValueAtTime(0.001, t0 + stepDur * 0.55);
-        osc.connect(g).connect(bgmGain);
-        osc.start(t0);
-        osc.stop(t0 + stepDur * 0.6);
-      }
-    }
-    // ドラム(キック/スネア/ハイハット)
-    if (song.drums) {
-      const d = song.drums[step % song.drums.length];
-      if (d === 1) {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(140, t0);
-        osc.frequency.exponentialRampToValueAtTime(45, t0 + 0.12);
-        g.gain.setValueAtTime(0.4, t0);
-        g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
-        osc.connect(g).connect(bgmGain);
-        osc.start(t0); osc.stop(t0 + 0.18);
-      } else if (d === 2 || d === 3) {
-        const dur = d === 2 ? 0.13 : 0.045;
-        const vol = d === 2 ? 0.22 : 0.1;
-        const len = Math.floor(ctx.sampleRate * dur);
-        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
-        const f = ctx.createBiquadFilter();
-        f.type = 'highpass';
-        f.frequency.value = d === 2 ? 1200 : 6000;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(vol, t0);
-        g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-        src.connect(f).connect(g).connect(bgmGain);
-        src.start(t0);
-      }
-    }
-    step = (step + 1) % song.lead.length;
   };
-  playStep();
-  bgmTimer = setInterval(playStep, stepDur * 1000);
+  tick();
+  bgmTimer = setInterval(tick, 40); // 40ms毎に先読み補充(発音時刻は予約済みなので正確)
 }
 
 export function stopBgm() {

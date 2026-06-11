@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { VIEW_W, VIEW_H } from '../main';
+import { VIEW_W, VIEW_H, SAFE_TOP } from '../main';
 import { sfx, setMuted, isMuted, stopBgm } from '../audio';
 import { fmt, DIFFICULTIES, loadSave } from '../data';
 import { openFloorSelect } from '../ui/FloorSelect';
@@ -67,31 +67,32 @@ export default class HudScene extends Phaser.Scene {
   // ステータス表示(左上)
   // ============================================================
   private buildStatusBars() {
+    const ST = SAFE_TOP;
     const g = this.add.graphics();
     g.fillStyle(0x1a1430, 0.75);
-    g.fillRoundedRect(10, 14, 286, 112, 14);
+    g.fillRoundedRect(10, 14 + ST, 286, 112, 14);
     g.lineStyle(2, 0xffb347, 0.9);
-    g.strokeRoundedRect(10, 14, 286, 112, 14);
+    g.strokeRoundedRect(10, 14 + ST, 286, 112, 14);
 
     // ポートレート枠
     g.fillStyle(0x2a1f3d, 1);
-    g.fillCircle(56, 62, 36);
+    g.fillCircle(56, 62 + ST, 36);
     g.lineStyle(3, 0xffb347, 1);
-    g.strokeCircle(56, 62, 36);
+    g.strokeCircle(56, 62 + ST, 36);
 
-    this.portraitIcon = this.add.sprite(56, 64, 'warrior_0').setScale(2.6);
-    this.lvText = this.add.text(104, 24, 'Lv.1 剣士', {
+    this.portraitIcon = this.add.sprite(56, 64 + ST, 'warrior_0').setScale(2.6);
+    this.lvText = this.add.text(104, 24 + ST, 'Lv.1 剣士', {
       fontFamily: 'sans-serif', fontSize: '17px', fontStyle: 'bold', color: '#ffe9b0',
     }).setResolution(2);
 
     this.barsG = this.add.graphics();
-    this.hpText = this.add.text(286, 52, '', {
+    this.hpText = this.add.text(286, 52 + ST, '', {
       fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#ffffff',
     }).setOrigin(1, 0.5).setResolution(2);
-    this.mpText = this.add.text(286, 74, '', {
+    this.mpText = this.add.text(286, 74 + ST, '', {
       fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#ffffff',
     }).setOrigin(1, 0.5).setResolution(2);
-    this.critText = this.add.text(104, 104, '', {
+    this.critText = this.add.text(104, 104 + ST, '', {
       fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#ffd24a',
     }).setResolution(2);
   }
@@ -100,27 +101,27 @@ export default class HudScene extends Phaser.Scene {
     const ui = this.game_.uiState;
     if (!ui) return;
     const g = this.barsG;
-    const x = 104, w = 182;
+    const x = 104, w = 182, ST = SAFE_TOP;
     g.clear();
     // HP
     g.fillStyle(0x3d2430, 1);
-    g.fillRoundedRect(x, 46, w, 13, 6);
+    g.fillRoundedRect(x, 46 + ST, w, 13, 6);
     g.fillStyle(0xe8443a, 1);
     const hpw = Math.max(0, (ui.hp / ui.maxhp) * (w - 2));
-    if (hpw > 1) g.fillRoundedRect(x + 1, 47, hpw, 11, 5);
+    if (hpw > 1) g.fillRoundedRect(x + 1, 47 + ST, hpw, 11, 5);
     // MP
     const mpFlash = this.time.now < this.mpFlashUntil && Math.floor(this.time.now / 100) % 2 === 0;
     g.fillStyle(mpFlash ? 0x6a2430 : 0x24303d, 1);
-    g.fillRoundedRect(x, 68, w, 13, 6);
+    g.fillRoundedRect(x, 68 + ST, w, 13, 6);
     g.fillStyle(0x3a6ae8, 1);
     const mpw = Math.max(0, (ui.mp / ui.maxmp) * (w - 2));
-    if (mpw > 1) g.fillRoundedRect(x + 1, 69, mpw, 11, 5);
+    if (mpw > 1) g.fillRoundedRect(x + 1, 69 + ST, mpw, 11, 5);
     // EXP
     g.fillStyle(0x3d3a24, 1);
-    g.fillRoundedRect(x, 90, w, 9, 4);
+    g.fillRoundedRect(x, 90 + ST, w, 9, 4);
     g.fillStyle(0xffd24a, 1);
     const xw = Math.max(0, Math.min(1, ui.exp / ui.expNext) * (w - 2));
-    if (xw > 1) g.fillRoundedRect(x + 1, 91, xw, 7, 3);
+    if (xw > 1) g.fillRoundedRect(x + 1, 91 + ST, xw, 7, 3);
 
     this.hpText.setText(`${fmt(ui.hp)}/${fmt(ui.maxhp)}`);
     this.mpText.setText(`${fmt(ui.mp)}/${fmt(ui.maxmp)}`);
@@ -144,7 +145,7 @@ export default class HudScene extends Phaser.Scene {
   // ============================================================
   private buildBossBar() {
     this.bossG = this.add.graphics();
-    this.bossText = this.add.text(VIEW_W / 2, 130, '', {
+    this.bossText = this.add.text(VIEW_W / 2, 130 + SAFE_TOP, '', {
       fontFamily: 'sans-serif', fontSize: '16px', fontStyle: 'bold',
       color: '#ffd8e2', stroke: '#5c1a2d', strokeThickness: 4,
     }).setOrigin(0.5).setResolution(2);
@@ -158,7 +159,7 @@ export default class HudScene extends Phaser.Scene {
       this.bossText.setText('');
       return;
     }
-    const w = 360, x = (VIEW_W - w) / 2, y = 146;
+    const w = 360, x = (VIEW_W - w) / 2, y = 146 + SAFE_TOP;
     this.bossText.setText(`${ui.boss.title} ${ui.boss.name}`);
     g.fillStyle(0x1a1430, 0.8);
     g.fillRoundedRect(x - 4, y - 4, w + 8, 26, 10);
@@ -175,23 +176,24 @@ export default class HudScene extends Phaser.Scene {
   // 右上(ステージ情報・ミュート)
   // ============================================================
   private buildTopRight() {
+    const ST = SAFE_TOP;
     const g = this.add.graphics();
     g.fillStyle(0x1a1430, 0.78);
-    g.fillRoundedRect(VIEW_W - 232, 14, 218, 70, 12);
+    g.fillRoundedRect(VIEW_W - 232, 14 + ST, 218, 70, 12);
     g.lineStyle(2, 0x8a7ac4, 0.8);
-    g.strokeRoundedRect(VIEW_W - 232, 14, 218, 70, 12);
+    g.strokeRoundedRect(VIEW_W - 232, 14 + ST, 218, 70, 12);
 
     // 階層(大)
-    this.stageText = this.add.text(VIEW_W - 123, 30, '', {
+    this.stageText = this.add.text(VIEW_W - 123, 30 + ST, '', {
       fontFamily: '"Arial Black", sans-serif', fontSize: '17px', fontStyle: 'bold', color: '#ffe9b0',
     }).setOrigin(0.5).setResolution(2);
     // ボス名 + 推奨レベル
-    this.killText = this.add.text(VIEW_W - 123, 58, '', {
+    this.killText = this.add.text(VIEW_W - 123, 58 + ST, '', {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#dcd2ff', align: 'center',
     }).setOrigin(0.5).setResolution(2);
 
     // 操作ボタン: 音量 → 一時停止 → トップに戻る の順
-    const iconY = 108;
+    const iconY = 108 + ST;
     const mk = (x: number, draw: (g: Phaser.GameObjects.Graphics, pressed: boolean) => void, onTap: () => void) => {
       const c = this.add.container(x, iconY).setDepth(60);
       const g = this.add.graphics();

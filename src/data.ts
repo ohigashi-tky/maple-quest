@@ -132,41 +132,41 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 1, jobName: '魔法使い', rankName: '1次', spriteKey: 'mage', atkBonus: 1,
         skills: [
-          { id: 'm1a', name: 'エナジーボルト', mp: 6, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
-          { id: 'm1b', name: 'マジッククロー', mp: 9, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
-          { id: 'm1c', name: 'マジックガード', mp: 12, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
+          { id: 'm1a', name: 'エナジーボルト', mp: 3, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
+          { id: 'm1b', name: 'マジッククロー', mp: 5, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
+          { id: 'm1c', name: 'マジックガード', mp: 6, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
         ],
       },
       {
         minLevel: 10, jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.25,
         skills: [
-          { id: 'm2a', name: 'コールドビーム', mp: 8, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 1800 },
-          { id: 'm2b', name: 'サンダーボルト', mp: 12, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
-          { id: 'm2c', name: 'メディテーション', mp: 16, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.35 },
+          { id: 'm2a', name: 'コールドビーム', mp: 4, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 900 },
+          { id: 'm2b', name: 'サンダーボルト', mp: 6, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
+          { id: 'm2c', name: 'メディテーション', mp: 8, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.35 },
         ],
       },
       {
         minLevel: 30, jobName: 'メイジ', rankName: '3次', spriteKey: 'mage3', atkBonus: 1.55,
         skills: [
-          { id: 'm3a', name: 'アイスストライク', mp: 10, cd: 1100, kind: 'freeze', mult: 1.6, hits: 3, radius: 100, durMs: 2200 },
-          { id: 'm3b', name: 'ライトニングボルト', mp: 14, cd: 1500, kind: 'thunder', mult: 1.5, hits: 1, targets: 5, range: 130 },
-          { id: 'm3c', name: 'スペルブースター', mp: 18, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
+          { id: 'm3a', name: 'アイスストライク', mp: 5, cd: 1100, kind: 'freeze', mult: 1.6, hits: 3, radius: 100, durMs: 1100 },
+          { id: 'm3b', name: 'ライトニングボルト', mp: 7, cd: 1500, kind: 'thunder', mult: 1.5, hits: 1, targets: 5, range: 130 },
+          { id: 'm3c', name: 'スペルブースター', mp: 9, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
         ],
       },
       {
         minLevel: 60, jobName: 'アークメイジ', rankName: '4次', spriteKey: 'mage4', atkBonus: 2.0,
         skills: [
-          { id: 'm4a', name: 'ブリザード', mp: 14, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 2000 },
-          { id: 'm4b', name: 'チェーンライトニング', mp: 16, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
-          { id: 'm4c', name: 'イフリート', mp: 22, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.55 },
+          { id: 'm4a', name: 'ブリザード', mp: 7, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 1000 },
+          { id: 'm4b', name: 'チェーンライトニング', mp: 8, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
+          { id: 'm4c', name: 'イフリート', mp: 11, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.55 },
         ],
       },
       {
         minLevel: 100, jobName: 'アークメイジ・極', rankName: '5次', spriteKey: 'mage5', atkBonus: 2.6,
         skills: [
-          { id: 'm5a', name: 'フローズンオーブ', mp: 14, cd: 1000, kind: 'projectile', mult: 1.8, hits: 4, speed: 300, pierce: true },
-          { id: 'm5b', name: 'サンダーブレイク', mp: 22, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
-          { id: 'm5c', name: 'ブリザードストーム', mp: 26, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 2400 },
+          { id: 'm5a', name: 'フローズンオーブ', mp: 7, cd: 1000, kind: 'projectile', mult: 1.8, hits: 4, speed: 300, pierce: true },
+          { id: 'm5b', name: 'サンダーブレイク', mp: 11, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
+          { id: 'm5c', name: 'ブリザードストーム', mp: 13, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 1200 },
         ],
       },
     ],
@@ -232,9 +232,10 @@ export interface FloorDef {
   scale: number;
 }
 
-export type BossArchetype = 'mush' | 'demon' | 'drake' | 'golem' | 'beast' | 'lord';
+// モンスター型: mush/demon/drake/golem/beast   人型: knight/witch/clown/lord
+export type BossArchetype = 'mush' | 'demon' | 'drake' | 'golem' | 'beast' | 'knight' | 'witch' | 'clown' | 'lord';
 
-// MapleStoryのエリア/ダンジョンボスを弱→強で配置(★=5階層ごとの強敵)
+// エリア/ダンジョンボスを弱→強で配置(★=5階層ごとの強敵)。人型と怪物型を作り分け
 interface FloorSeed {
   key: string; name: string; title: string; req: number;
   arch: BossArchetype; tint: number; major?: boolean; scale?: number;
@@ -242,27 +243,27 @@ interface FloorSeed {
 const FLOOR_SEEDS: FloorSeed[] = [
   { key: 'mushmom', name: 'マッシュモム', title: '森の主', req: 1, arch: 'mush', tint: 0xef7d2f, scale: 1.4 },
   { key: 'bluemushmom', name: 'ブルーマッシュモム', title: '青き森の主', req: 8, arch: 'mush', tint: 0x5a8fe0, scale: 1.45 },
-  { key: 'faust', name: 'ファウスト', title: '闇の従者', req: 16, arch: 'demon', tint: 0x7a52b4, scale: 1.4 },
-  { key: 'dyle', name: 'ダイル', title: '沼の捕食者', req: 24, arch: 'drake', tint: 0x4a9c3a, scale: 1.45 },
+  { key: 'faust', name: 'ファウスト', title: '闇の従者', req: 16, arch: 'knight', tint: 0x6a52b4, scale: 1.5 },
+  { key: 'dyle', name: 'ダイル', title: '沼の捕食者', req: 24, arch: 'drake', tint: 0x4a9c3a, scale: 1.5 },
   { key: 'jrbalrog', name: 'ジュニアバルログ', title: '小さき災い', req: 32, arch: 'demon', tint: 0xc04a2a, major: true, scale: 2.2 },
 
   { key: 'stumpy', name: 'スタンピー', title: '怒れる古木', req: 42, arch: 'golem', tint: 0x8a5a32, scale: 1.5 },
   { key: 'griffey', name: 'グリフィー', title: '天空の猛禽', req: 52, arch: 'beast', tint: 0xe0a030, scale: 1.5 },
-  { key: 'manon', name: 'マノン', title: '古龍', req: 64, arch: 'drake', tint: 0xd86a9c, scale: 1.55 },
-  { key: 'anego', name: 'アネゴ', title: '夜叉の女傑', req: 76, arch: 'lord', tint: 0xd84a6a, scale: 1.45 },
+  { key: 'manon', name: 'マノン', title: '古龍', req: 64, arch: 'drake', tint: 0xd86a9c, scale: 1.6 },
+  { key: 'anego', name: 'アネゴ', title: '夜叉の女傑', req: 76, arch: 'witch', tint: 0xd84a6a, scale: 1.5 },
   { key: 'crimsonbalrog', name: 'クリムゾンバルログ', title: '深紅の魔王', req: 88, arch: 'demon', tint: 0xd81a1a, major: true, scale: 2.5 },
 
-  { key: 'dunas', name: 'デュナス', title: '機械龍', req: 100, arch: 'drake', tint: 0x4a7fd6, scale: 1.6 },
-  { key: 'pierre', name: 'ピエール', title: '深淵の道化', req: 112, arch: 'lord', tint: 0xb04ad8, scale: 1.5 },
-  { key: 'vonleon', name: 'ヴァンレオン', title: '獅子王', req: 124, arch: 'lord', tint: 0x3a6ae8, scale: 1.55 },
-  { key: 'hilla', name: 'ヒルラ', title: '血の魔女', req: 136, arch: 'lord', tint: 0x8a1a4a, scale: 1.5 },
+  { key: 'dunas', name: 'デュナス', title: '機械龍', req: 100, arch: 'drake', tint: 0x4a7fd6, scale: 1.65 },
+  { key: 'pierre', name: 'ピエール', title: '深淵の道化', req: 112, arch: 'clown', tint: 0xb04ad8, scale: 1.55 },
+  { key: 'vonleon', name: 'ヴァンレオン', title: '獅子王', req: 124, arch: 'knight', tint: 0x3a6ae8, scale: 1.6 },
+  { key: 'hilla', name: 'ヒルラ', title: '血の魔女', req: 136, arch: 'witch', tint: 0x8a1a4a, scale: 1.55 },
   { key: 'zakum', name: 'ザクム', title: '炎の巨神', req: 150, arch: 'golem', tint: 0xd8541a, major: true, scale: 2.7 },
 
-  { key: 'horntail', name: 'ホーンテイル', title: '双頭の邪龍', req: 168, arch: 'drake', tint: 0x3aa84a, scale: 1.85 },
-  { key: 'magnus', name: 'マグナス', title: '堕ちた翼', req: 186, arch: 'lord', tint: 0x2a2a3a, scale: 1.6 },
-  { key: 'lucid', name: 'ルシード', title: '夢幻の蝶', req: 204, arch: 'lord', tint: 0x6ad8c4, scale: 1.6 },
-  { key: 'damien', name: 'デミアン', title: '絶望の剣', req: 224, arch: 'lord', tint: 0xc02a3a, scale: 1.65 },
-  { key: 'blackmage', name: 'ブラックマゲ', title: '黒き魔導士', req: 250, arch: 'lord', tint: 0x1a1024, major: true, scale: 3.0 },
+  { key: 'horntail', name: 'ホーンテイル', title: '双頭の邪龍', req: 168, arch: 'drake', tint: 0x3aa84a, scale: 1.9 },
+  { key: 'magnus', name: 'マグナス', title: '堕ちた翼', req: 186, arch: 'knight', tint: 0x3a3a4a, scale: 1.65 },
+  { key: 'lucid', name: 'ルシード', title: '夢幻の蝶', req: 204, arch: 'witch', tint: 0x6ad8c4, scale: 1.6 },
+  { key: 'damien', name: 'デミアン', title: '絶望の剣', req: 224, arch: 'knight', tint: 0xc02a3a, scale: 1.7 },
+  { key: 'blackmage', name: 'ブラックマゲ', title: '黒き魔導士', req: 250, arch: 'lord', tint: 0x2a1a3a, major: true, scale: 3.0 },
 ];
 
 function themeForFloor(f: number): Theme {
@@ -308,21 +309,25 @@ export const ARENA_W = 560; // 道場アリーナの横幅(狭め・道場らし
 export interface DifficultyDef {
   key: string;
   name: string;
-  reqMul: number;  // 推奨レベル(=敵ステータス)の倍率
+  flat: number;    // 推奨レベルの下限(段階間で確実に強くする)
+  slope: number;   // 階層ごとの推奨レベルの伸び
   expMul: number;  // 経験値ボーナス
   color: number;
   desc: string;
 }
+// 実効推奨Lv = flat + baseReq(floor) * slope
+// 前段階の最終階(=次段階の1階の手強さ)が次段階1階で「格段に強い」ようflatを設定
 export const DIFFICULTIES: DifficultyDef[] = [
-  { key: 'easy',   name: 'EASY',   reqMul: 1.0, expMul: 1.0,  color: 0x4aa84a, desc: 'まずはここから' },
-  { key: 'normal', name: 'NORMAL', reqMul: 1.7, expMul: 1.5,  color: 0x3a7fd6, desc: '敵が手強くなる' },
-  { key: 'hard',   name: 'HARD',   reqMul: 2.8, expMul: 2.3,  color: 0xd8730f, desc: '歴戦の挑戦者へ' },
-  { key: 'oni',    name: '鬼モード', reqMul: 4.4, expMul: 3.6, color: 0xc02a3a, desc: 'Lv150以上で挑め' },
+  { key: 'easy',   name: 'EASY',   flat: 0,   slope: 1.0, expMul: 1.0,  color: 0x4aa84a, desc: 'まずはここから (1階〜)' },
+  { key: 'normal', name: 'NORMAL', flat: 28,  slope: 1.6, expMul: 1.6,  color: 0x3a7fd6, desc: '1階から手強い (推奨Lv30〜)' },
+  { key: 'hard',   name: 'HARD',   flat: 72,  slope: 2.6, expMul: 2.4,  color: 0xd8730f, desc: '歴戦の挑戦者へ (推奨Lv75〜)' },
+  { key: 'oni',    name: '鬼モード', flat: 150, slope: 4.0, expMul: 3.8, color: 0xc02a3a, desc: 'Lv150以上で挑め (推奨Lv154〜)' },
 ];
 
 // 階層×難易度の実効推奨レベル(敵の強さの基準)
 export function effReq(f: FloorDef, diff: number): number {
-  return Math.round(f.reqLevel * DIFFICULTIES[diff].reqMul);
+  const d = DIFFICULTIES[diff];
+  return Math.round(d.flat + f.reqLevel * d.slope);
 }
 
 // ボスのステータス(実効推奨レベルから算出)

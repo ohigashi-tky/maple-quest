@@ -16,6 +16,23 @@ function computeViewH(): number {
 
 export const VIEW_H = computeViewH();
 
+// iPhoneのセーフエリア(ダイナミックアイランド/ステータスバー)を避けるための上部余白(ゲーム内座標)
+function computeSafeTop(): number {
+  try {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);pointer-events:none;';
+    document.body.appendChild(probe);
+    const px = probe.getBoundingClientRect().height;
+    probe.remove();
+    // 画面ピクセル→ゲーム内座標へ変換(縦は画面いっぱいに描画)
+    const units = px * VIEW_H / Math.max(1, window.innerHeight);
+    return Math.round(units);
+  } catch {
+    return 0;
+  }
+}
+export const SAFE_TOP = computeSafeTop();
+
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: VIEW_W,
@@ -32,7 +49,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  input: { activePointers: 4 },
+  input: { activePointers: 6 },
   scene: [BootScene, TitleScene, GameScene, HudScene],
 };
 
