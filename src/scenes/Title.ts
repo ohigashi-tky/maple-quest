@@ -78,15 +78,15 @@ export default class TitleScene extends Phaser.Scene {
 
     // 戦士で挑戦(1階 EASY から)。ゲーム内で魔法使いに交代可能
     this.selectedClass = 'warrior';
-    this.makeButton(cx, VIEW_H - 380, '挑 戦', '戦士で第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
+    this.makeButton(cx, VIEW_H - 470, '挑 戦', '戦士で第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
     // 階層をえらぶ(難易度・到達階層から)
-    this.makeButton(cx, VIEW_H - 292, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
+    this.makeButton(cx, VIEW_H - 382, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
       initAudio();
       openFloorSelect(this, loadSave(), 0, (f, d) => this.start(f, d));
     });
 
     // Lv1からやり直す(確認あり・小さめ。誤タップ防止に十分な余白を上に)
-    this.makeSmallButton(cx, VIEW_H - 150, 'Lv1からやり直す', 0x9a3a4a, () => this.confirmReset());
+    this.makeSmallButton(cx, VIEW_H - 250, 'Lv1からやり直す', 0x9a3a4a, () => this.confirmReset());
 
     // 音量切り替えアイコン(右上・セーフエリア考慮)
     this.buildSoundToggle();
