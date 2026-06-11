@@ -320,112 +320,119 @@ const MUSHROOM: SpriteDef = {
   ],
 };
 
-// ---------- グリーンスライム (14x12) ----------
+// ---------- スパイクスライム (14x13) とげ付きの獰猛スライム ----------
 const SLIME: SpriteDef = {
   palette: {
-    e: '#58c443', E: '#3c9230', d: '#8ee07a', k: '#2a2118', m: '#2f7a22',
+    e: '#58c443', E: '#3c9230', d: '#8ee07a', k: '#1d2a14', m: '#2f7a22',
+    s: '#2a5c1e', w: '#ffffff',
   },
   frames: [
     [
-      '......ee......',
-      '.....eeee.....',
-      '....eeeeee....',
-      '...eedeeeee...',
-      '..eeddeeeeee..',
+      '..s....ss....s',
+      '..ss..eses..ss',
+      '...seeeeeees..',
+      '...eeeeeeeee..',
+      '..eedeeeeeeee.',
       '.eeedeeeeeeee.',
-      '.eeeeeeeeeeee.',
+      '.ekeeeeeeekee.',
       '.ekkeeeeekkee.',
-      '.ekkeeeeekkee.',
-      '.eeeeemmeeeee.',
+      '.eekkeeekkeee.',
+      '.eeewmmweeeee.',
       '.EEeeeeeeeeEE.',
       '..EEEEEEEEEE..',
     ],
     [
       '..............',
-      '......ee......',
-      '.....eeee.....',
-      '....eedeee....',
-      '..eeeddeeeee..',
-      '.eeeedeeeeeee.',
-      'eeeeeeeeeeeeee',
-      'ekkeeeeeeekkee',
-      'ekkeeeeeeekkee',
-      'eeeeeemmeeeeee',
+      '..s...ss....s.',
+      '..ss.eses..ss.',
+      '...seeeeeees..',
+      '..eeedeeeeee..',
+      '.eeedeeeeeeee.',
+      'eekeeeeeeekeee',
+      'eekkeeeeekkeee',
+      'eeekkeeekkeeee',
+      'eeeewmmweeeeee',
       'EEeeeeeeeeeeEE',
       '.EEEEEEEEEEEE.',
     ],
   ],
 };
 
-// ---------- リボンブタ (16x13) ----------
+// ---------- アーマーブタ (16x14) 鉄兜と牙の戦闘ブタ ----------
 const PIG: SpriteDef = {
   palette: {
-    p: '#f4a7b9', P: '#d97f96', n: '#e8829e', k: '#2a2118', r: '#d8333f', R: '#9c1f2d', w: '#ffd7e2',
+    p: '#f4a7b9', P: '#d97f96', n: '#e8829e', k: '#2a2118',
+    a: '#8a96a8', A: '#5c6878', w: '#ffffff', r: '#ff3a3a',
   },
   frames: [
     [
-      '..rr............',
-      '.rrrr...........',
-      '..rRr.pp...pp...',
-      '...rpppp...pp...',
+      '.......aa.......',
+      '...aaaaaaaaaa...',
+      '..aaaaaaaaaaaa..',
+      '..aAAAAAAAAAAa..',
       '..pppppppppppp..',
-      '.pppppppppppppp.',
-      '.ppkkpppppkkppp.',
-      '.ppkkpppppkkppp.',
-      'wpppppnnnppppppw',
-      'wpppppnknpppppww',
-      '.ppppppnnpppppp.',
+      '.ppkppppppppkpp.',
+      '.ppkkppppppkkpp.',
+      '.pppkkpppppkkpp.',
+      'wpppppnnnpppppww',
+      'wwppppnknppppwww',
+      '.pwpppnnnpppwpp.',
+      '.ppppppppppppp..',
       '..PPpppppppPP...',
       '..PP.......PP...',
     ],
     [
-      '..rr............',
-      '.rrrr...........',
-      '..rRr.pp...pp...',
-      '...rpppp...pp...',
+      '.......aa.......',
+      '...aaaaaaaaaa...',
+      '..aaaaaaaaaaaa..',
+      '..aAAAAAAAAAAa..',
       '..pppppppppppp..',
-      '.pppppppppppppp.',
-      '.ppkkpppppkkppp.',
-      '.ppkkpppppkkppp.',
-      'wpppppnnnppppppw',
-      'wpppppnknpppppww',
-      '.ppppppnnpppppp.',
+      '.ppkppppppppkpp.',
+      '.ppkkppppppkkpp.',
+      '.pppkkpppppkkpp.',
+      'wpppppnnnpppppww',
+      'wwppppnknppppwww',
+      '.pwpppnnnpppwpp.',
+      '.ppppppppppppp..',
       '..PPP.....PPP...',
       '.PP.........PP..',
     ],
   ],
 };
 
-// ---------- ダークバット (18x12) ----------
+// ---------- デビルバット (18x13) 角と赤眼の悪魔コウモリ ----------
 const BAT: SpriteDef = {
   palette: {
-    v: '#6a4a9c', V: '#4a3270', d: '#8a66c4', k: '#2a2118', w: '#ffffff', f: '#e8e0ff',
+    v: '#5a3a8c', V: '#3a2460', d: '#7a52b4', k: '#1d1430', w: '#ffffff',
+    f: '#e8e0ff', r: '#ff3a3a', h: '#aab0c0',
   },
   frames: [
     [
-      'v................v',
-      'vv..............vv',
+      'v......h..h......v',
+      'vv.....hh.hh....vv',
       'vvv....vvvv....vvv',
       'vdvv..vvvvvv..vvdv',
       'vddvvvvvvvvvvvvddv',
-      '.vvvvwkvvvvkwvvvv.',
-      '..vvvwkvvvvkwvvv..',
+      '.vvvvrrvvvvrrvvvv.',
+      '..vvvrrvvvvrrvvv..',
       '...vvvvvvvvvvvv...',
-      '....vvfvvvvfvv....',
+      '....vvwvvvvwvv....',
+      '....vvwvvvvwvv....',
       '.....Vvvvvvvv.....',
       '......VVVVVV......',
       '.......V..V.......',
     ],
     [
-      '..................',
-      '..................',
+      '.......h..h.......',
+      '.......hh.hh......',
       '.......vvvv.......',
       '..vv..vvvvvv..vv..',
       '.vvvvvvvvvvvvvvvv.',
-      'vvvvvwkvvvvkwvvvvv',
-      'vvvvvwkvvvvkwvvvvv',
+      'vvvvvrrvvvvrrvvvvv',
+      'vvvvvrrvvvvrrvvvvv',
       '.vvvvvvvvvvvvvvvv.',
-      '..vvvvfvvvvfvvvv..',
+      '..vvvvwvvvvwvvvv..',
+      '..vvvvwvvvvwvvvv..',
       '....VvvvvvvvvV....',
       '......VVVVVV......',
       '.......V..V.......',
@@ -433,46 +440,46 @@ const BAT: SpriteDef = {
   ],
 };
 
-// ---------- ゾンビマッシュ (16x16) ----------
+// ---------- カオスマッシュ (16x16) 棘と赤眼の凶悪キノコ ----------
 const ZOMBIESHROOM: SpriteDef = {
   palette: {
-    a: '#7a8a99', A: '#56636f', w: '#aab8c4', f: '#c9d4b0', F: '#a4b08a',
-    k: '#1d2a14', m: '#5a6b4a', x: '#d8e44a',
+    a: '#6a5a88', A: '#483c60', w: '#9a8ab8', f: '#c9d4b0', F: '#a4b08a',
+    k: '#1d2a14', m: '#5a6b4a', x: '#3a3050', r: '#ff3a3a', q: '#ffd24a',
   },
   frames: [
     [
-      '......aaaaaa....',
-      '....aaaaaaaaaa..',
-      '...aawwaaaaaaaa.',
-      '..aaawwaaaaaaaa.',
-      '..aaaaaaaaawwaa.',
+      '...x..xxxx..x...',
+      '....xaaaaaax....',
+      '...aawwaaaaaax..',
+      '..aaawwaaaaaaa..',
+      '..aaaaaaaaawwa..',
       '..aaaaaaaaawwaa.',
       '..aAAAAAAAAAAAa.',
       '...AAAAAAAAAAA..',
       '....ffffffffff..',
-      '....fxxffffxxf..',
-      '....fxkffffkxf..',
+      '....frrffffrrf..',
+      '....frkffffkrf..',
       '....ffffffffff..',
       '....ffmmmmmfff..',
-      '.....fmfffmff...',
+      '.....fmqqqmff...',
       '......FF..FF....',
       '......FF..FF....',
     ],
     [
-      '......aaaaaa....',
-      '....aaaaaaaaaa..',
-      '...aawwaaaaaaaa.',
-      '..aaawwaaaaaaaa.',
-      '..aaaaaaaaawwaa.',
+      '...x..xxxx..x...',
+      '....xaaaaaax....',
+      '...aawwaaaaaax..',
+      '..aaawwaaaaaaa..',
+      '..aaaaaaaaawwa..',
       '..aaaaaaaaawwaa.',
       '..aAAAAAAAAAAAa.',
       '...AAAAAAAAAAA..',
       '....ffffffffff..',
-      '....fxxffffxxf..',
-      '....fxkffffkxf..',
+      '....frrffffrrf..',
+      '....frkffffkrf..',
       '....ffffffffff..',
       '....ffmmmmmfff..',
-      '.....fmfffmff...',
+      '.....fmqqqmff...',
       '.....FF....FF...',
       '....FF......FF..',
     ],
@@ -934,14 +941,17 @@ const PORTAL: SpriteDef = {
   ],
 };
 
-// ---------- 回復薬アイコン ----------
-const POTION_HP: SpriteDef = {
-  palette: { r: '#e8443a', R: '#a82820', w: '#ffd8d0', c: '#d8a05a', g: '#f0f0f0' },
+// ---------- エリクサー(HP/MP全回復) ----------
+const ELIXIR: SpriteDef = {
+  palette: {
+    r: '#ffb830', R: '#d88a10', w: '#fff4d0', c: '#d8a05a', g: '#f0f0f0',
+    s: '#ffffff',
+  },
   frames: [
     [
-      '....cc....',
-      '....cc....',
-      '...gggg...',
+      '....cc..s.',
+      '....cc.sss',
+      '...gggg.s.',
       '...grrg...',
       '..grrrrg..',
       '.grrwrrrg.',
@@ -954,21 +964,21 @@ const POTION_HP: SpriteDef = {
   ],
 };
 
-const POTION_MP: SpriteDef = {
-  palette: { r: '#3a6ae8', R: '#2038a8', w: '#d0e0ff', c: '#d8a05a', g: '#f0f0f0' },
+// ---------- 氷の結晶(アイスストライク用) ----------
+const ICE: SpriteDef = {
+  palette: { b: '#5ab0e8', w: '#d8f2ff', W: '#ffffff' },
   frames: [
     [
-      '....cc....',
-      '....cc....',
-      '...gggg...',
-      '...grrg...',
-      '..grrrrg..',
-      '.grrwrrrg.',
-      '.grwwrrrg.',
-      '.grrrrrrg.',
-      '.gRrrrrRg.',
-      '..gRRRRg..',
-      '...gggg...',
+      '.....bb.....',
+      '....bwwb....',
+      '...bwWWwb...',
+      '..bwWWWWwb..',
+      '.bwWWWWWWwb.',
+      '.bwWWWWWWwb.',
+      '..bwWWWWwb..',
+      '...bwWWwb...',
+      '....bwwb....',
+      '.....bb.....',
     ],
   ],
 };
@@ -1136,8 +1146,8 @@ const SPRITES: Record<string, SpriteDef> = {
   fx_feather: FEATHER,
   fx_star: STAR,
   portal: PORTAL,
-  potion_hp: POTION_HP,
-  potion_mp: POTION_MP,
+  elixir: ELIXIR,
+  fx_ice: ICE,
   tree: TREE,
   cloud: CLOUD,
 };
@@ -1293,6 +1303,19 @@ export function createAllTextures(scene: Phaser.Scene) {
   px.getContext().fillStyle = '#ffffff';
   px.getContext().fillRect(0, 0, 2, 2);
   px.refresh();
+
+  // ジェネシス用: 天から降る黄金の光の柱
+  const pillar = scene.textures.createCanvas('fx_pillar_0', 14, 56)!;
+  const pctx = pillar.getContext();
+  const grad = pctx.createLinearGradient(0, 0, 14, 0);
+  grad.addColorStop(0, 'rgba(255,210,74,0)');
+  grad.addColorStop(0.25, 'rgba(255,210,74,0.55)');
+  grad.addColorStop(0.5, 'rgba(255,250,220,0.95)');
+  grad.addColorStop(0.75, 'rgba(255,210,74,0.55)');
+  grad.addColorStop(1, 'rgba(255,210,74,0)');
+  pctx.fillStyle = grad;
+  pctx.fillRect(0, 0, 14, 56);
+  pillar.refresh();
   // タイル
   makeTile(scene, 'tile_grass', 'grass');
   makeTile(scene, 'tile_sky', 'sky');
@@ -1330,4 +1353,5 @@ export function createAllAnims(scene: Phaser.Scene) {
   mk('fx_slash_play', 'fx_slash', [0, 1], 14, 0);
   mk('fx_claw_play', 'fx_claw', [0, 1], 14, 0);
   mk('fx_heal_play', 'fx_heal', [0, 1, 0, 1], 8, 0);
+  mk('portal_spin2', 'portal', [0, 1], 8);
 }

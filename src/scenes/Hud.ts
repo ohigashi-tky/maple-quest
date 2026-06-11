@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { VIEW_W, VIEW_H } from '../main';
 import { sfx, setMuted, isMuted, stopBgm, playBgm } from '../audio';
+import { fmt } from '../data';
 import type GameScene from './Game';
 
 interface BtnOpts {
@@ -30,14 +31,14 @@ export default class HudScene extends Phaser.Scene {
   private lvText!: Phaser.GameObjects.Text;
   private hpText!: Phaser.GameObjects.Text;
   private mpText!: Phaser.GameObjects.Text;
+  private critText!: Phaser.GameObjects.Text;
   private stageText!: Phaser.GameObjects.Text;
   private killText!: Phaser.GameObjects.Text;
   private bossG!: Phaser.GameObjects.Graphics;
   private bossText!: Phaser.GameObjects.Text;
 
   private skillBtns: Btn[] = [];
-  private potionHpBtn!: Btn;
-  private potionMpBtn!: Btn;
+  private potionHpBtn!: Btn; // エリクサーボタン
   private switchBtn!: Btn;
   private switchIcon!: Phaser.GameObjects.Sprite;
 
@@ -65,9 +66,9 @@ export default class HudScene extends Phaser.Scene {
   private buildStatusBars() {
     const g = this.add.graphics();
     g.fillStyle(0x1a1430, 0.75);
-    g.fillRoundedRect(10, 14, 286, 96, 14);
+    g.fillRoundedRect(10, 14, 286, 112, 14);
     g.lineStyle(2, 0xffb347, 0.9);
-    g.strokeRoundedRect(10, 14, 286, 96, 14);
+    g.strokeRoundedRect(10, 14, 286, 112, 14);
 
     // ポートレート枠
     g.fillStyle(0x2a1f3d, 1);
@@ -87,6 +88,9 @@ export default class HudScene extends Phaser.Scene {
     this.mpText = this.add.text(286, 74, '', {
       fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#ffffff',
     }).setOrigin(1, 0.5).setResolution(2);
+    this.critText = this.add.text(104, 104, '', {
+      fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#ffd24a',
+    }).setResolution(2);
   }
 
   private drawBars() {
@@ -115,9 +119,13 @@ export default class HudScene extends Phaser.Scene {
     const xw = Math.max(0, Math.min(1, ui.exp / ui.expNext) * (w - 2));
     if (xw > 1) g.fillRoundedRect(x + 1, 91, xw, 7, 3);
 
-    this.hpText.setText(`${ui.hp}/${ui.maxhp}`);
-    this.mpText.setText(`${ui.mp}/${ui.maxmp}`);
+    this.hpText.setText(`${fmt(ui.hp)}/${fmt(ui.maxhp)}`);
+    this.mpText.setText(`${fmt(ui.mp)}/${fmt(ui.maxmp)}`);
     this.lvText.setText(`Lv.${ui.level} ${ui.charName}`);
+    // クリティカル率 + バフ残り秒
+    let crit = `CRI ${Math.round(ui.critRate * 100)}%`;
+    if (ui.buffLeft > 0) crit += `  ${ui.buffName} ${Math.ceil(ui.buffLeft / 1000)}s`;
+    this.critText.setText(crit);
     const tex = `${ui.spriteKey}_0`;
     if (this.portraitIcon.texture.key !== tex) this.portraitIcon.setTexture(tex);
     const otherTex = `${ui.otherSpriteKey}_0`;
@@ -187,29 +195,42 @@ export default class HudScene extends Phaser.Scene {
   }
 
   // ============================================================
-  // 移動ボタン(左下)
+  // 移動ボタン(左下)— 下方向なし: 左・右・上(垂直J)・左上/右上(斜めJ)
   // ============================================================
   private buildDpad() {
-    const mk = (x: number, y: number, flip: boolean, dir: 'left' | 'right') => {
+    // angle: 矢印の向き(度)。0=右, 180=左, -90=上, -135=左上, -45=右上
+    const mk = (x: number, y: number, r: number, angle: number, dirs: ('left' | 'right' | 'up')[]) => {
       const c = this.add.container(x, y);
       const g = this.add.graphics();
       g.fillStyle(0x1a1430, 0.55);
-      g.fillCircle(0, 0, 47);
+      g.fillCircle(0, 0, r);
       g.lineStyle(3, 0xffffff, 0.35);
-      g.strokeCircle(0, 0, 47);
-      // 矢印
+      g.strokeCircle(0, 0, r);
+      // 矢印(angle方向を向く三角形)
       g.fillStyle(0xffffff, 0.85);
-      const s = flip ? -1 : 1;
-      g.fillTriangle(s * 18, 0, s * -10, -20, s * -10, 20);
+      const rad = (angle * Math.PI) / 180;
+      const tip = r * 0.42;
+      const back = r * 0.24;
+      const wide = r * 0.42;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      const rot = (px: number, py: number): [number, number] => [px * cos - py * sin, px * sin + py * cos];
+      const [ax, ay] = rot(tip, 0);
+      const [bx, by] = rot(-back, -wide);
+      const [cx2, cy2] = rot(-back, wide);
+      g.fillTriangle(ax, ay, bx, by, cx2, cy2);
       c.add(g);
-      c.setSize(110, 110);
+      c.setSize(r * 2 + 8, r * 2 + 8);
       c.setInteractive();
       const on = () => {
-        this.game_.setPad({ [dir]: true } as never);
+        const patch: Record<string, boolean> = {};
+        for (const d of dirs) patch[d] = true;
+        this.game_.setPad(patch as never);
         g.setAlpha(1.5);
       };
       const off = () => {
-        this.game_.setPad({ [dir]: false } as never);
+        const patch: Record<string, boolean> = {};
+        for (const d of dirs) patch[d] = false;
+        this.game_.setPad(patch as never);
         g.setAlpha(1);
       };
       c.on('pointerdown', on);
@@ -219,8 +240,14 @@ export default class HudScene extends Phaser.Scene {
       c.on('pointerupoutside', off);
       return c;
     };
-    mk(64, VIEW_H - 102, true, 'left');
-    mk(174, VIEW_H - 102, false, 'right');
+    const baseY = VIEW_H - 96;
+    // 下段: 左右移動
+    mk(58, baseY, 46, 180, ['left']);
+    mk(166, baseY, 46, 0, ['right']);
+    // 上段: 斜めジャンプ(左上/右上) と 垂直ジャンプ(上)
+    mk(48, baseY - 104, 38, -135, ['up', 'left']);
+    mk(112, baseY - 150, 40, -90, ['up']);
+    mk(176, baseY - 104, 38, -45, ['up', 'right']);
   }
 
   // ============================================================
@@ -293,25 +320,22 @@ export default class HudScene extends Phaser.Scene {
   private buildActionButtons() {
     const game = () => this.game_;
 
-    // ジャンプ(青・大)
-    this.makeButton(478, VIEW_H - 222, { r: 42, color: 0x3a7fd6, label: 'ジャンプ' }, () => game().doJump());
-    // 攻撃(オレンジ・特大)連打対応
-    this.makeButton(458, VIEW_H - 98, { r: 56, color: 0xff8a2a, label: '攻撃' }, () => game().doAttack(), true);
+    // 攻撃(オレンジ・特大)連打対応 — ジャンプは移動キーの上方向に統合したため廃止
+    this.makeButton(462, VIEW_H - 96, { r: 58, color: 0xff8a2a, label: '攻撃' }, () => game().doAttack(), true);
 
     // スキル3つ(攻撃ボタンの周りに扇状配置)
-    const skillPos: [number, number][] = [[338, VIEW_H - 58], [318, VIEW_H - 148], [360, VIEW_H - 232]];
+    const skillPos: [number, number][] = [[330, VIEW_H - 76], [318, VIEW_H - 176], [378, VIEW_H - 262]];
     this.skillBtns = skillPos.map(([x, y], i) =>
-      this.makeButton(x, y, { r: 36, color: 0x8a5ac4, label: '-', sub: '' }, () => game().doSkill(i))
+      this.makeButton(x, y, { r: 38, color: 0x8a5ac4, label: '-', sub: '' }, () => game().doSkill(i))
     );
 
-    // 回復薬
-    this.potionHpBtn = this.makeButton(252, VIEW_H - 208, { r: 31, color: 0xc43a4a, icon: 'potion_hp_0', sub: '0' }, () => game().usePotion('hp'));
-    this.potionMpBtn = this.makeButton(252, VIEW_H - 284, { r: 31, color: 0x3a4ac4, icon: 'potion_mp_0', sub: '0' }, () => game().usePotion('mp'));
+    // エリクサー(HP/MP全回復・1種)
+    this.potionHpBtn = this.makeButton(250, VIEW_H - 232, { r: 34, color: 0xd8930f, icon: 'elixir_0', iconScale: 2.4, sub: '0' }, () => game().useElixir());
 
     // キャラ交代(ステータスパネルの下)
-    this.switchBtn = this.makeButton(48, 152, { r: 28, color: 0x4aa84a, label: '' }, () => game().switchChar());
-    this.switchIcon = this.add.sprite(48, 150, 'mage_0').setScale(1.7);
-    this.add.text(48, 176, '交代', {
+    this.switchBtn = this.makeButton(48, 178, { r: 28, color: 0x4aa84a, label: '' }, () => game().switchChar());
+    this.switchIcon = this.add.sprite(48, 176, 'mage_0').setScale(1.7);
+    this.add.text(48, 202, '交代', {
       fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', stroke: '#1a3d1a', strokeThickness: 3,
     }).setOrigin(0.5).setResolution(2);
   }
@@ -454,16 +478,16 @@ export default class HudScene extends Phaser.Scene {
       const btn = this.skillBtns[i];
       if (!btn) return;
       if (btn.label && btn.label.text !== s.label) btn.label.setText(s.label);
-      if (btn.sub && btn.sub.text !== `MP${s.mp}`) btn.sub.setText(`MP${s.mp}`);
+      const mpLabel = `MP${fmt(s.mp)}`;
+      if (btn.sub && btn.sub.text !== mpLabel) btn.sub.setText(mpLabel);
       this.drawCooldown(btn, s.cdLeft, s.cd);
       const noMp = ui.mp < s.mp;
       btn.container.setAlpha(noMp ? 0.55 : 1);
     });
 
-    if (this.potionHpBtn.sub) this.potionHpBtn.sub.setText(String(ui.potions.hp));
-    if (this.potionMpBtn.sub) this.potionMpBtn.sub.setText(String(ui.potions.mp));
-    this.potionHpBtn.container.setAlpha(ui.potions.hp > 0 ? 1 : 0.5);
-    this.potionMpBtn.container.setAlpha(ui.potions.mp > 0 ? 1 : 0.5);
+    // エリクサー(残数表示)
+    if (this.potionHpBtn.sub) this.potionHpBtn.sub.setText(String(ui.elixirs));
+    this.potionHpBtn.container.setAlpha(ui.elixirs > 0 ? 1 : 0.5);
     this.drawCooldown(this.switchBtn, ui.switchCdLeft, 2000);
   }
 }
