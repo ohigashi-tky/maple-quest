@@ -77,7 +77,8 @@ function noise(dur: number, vol = 0.2, delay = 0, lowpass = 4000) {
 export type SfxName =
   | 'jump' | 'slash' | 'claw' | 'fire' | 'thunder' | 'heal' | 'rush'
   | 'hit' | 'hurt' | 'die' | 'mobdie' | 'bossdie' | 'potion' | 'levelup'
-  | 'select' | 'portal' | 'switch' | 'crit' | 'denied';
+  | 'select' | 'portal' | 'switch' | 'crit' | 'denied'
+  | 'slashpro' | 'magicpro' | 'cyclone';
 
 export function sfx(name: SfxName) {
   if (!ctx || muted) return;
@@ -104,6 +105,26 @@ export function sfx(name: SfxName) {
     case 'portal': [330, 392, 494, 659, 784].forEach((f, i) => tone(f, 0.14, 'triangle', 0.1, i * 0.06)); break;
     case 'switch': tone(440, 0.07, 'square', 0.1); tone(587, 0.07, 'square', 0.1, 0.06); break;
     case 'denied': tone(180, 0.1, 'square', 0.1); tone(150, 0.12, 'square', 0.1, 0.08); break;
+    // 戦士の主力斬撃: 金属的で重い斬撃 + 余韻のリング
+    case 'slashpro':
+      noise(0.07, 0.18, 0, 7000);                          // 鋭い空気の切れ
+      tone(680, 0.05, 'sawtooth', 0.1, 0, -360);            // 刃の振り抜き
+      tone(1320, 0.16, 'triangle', 0.08, 0.03, -700);      // 金属の余韻
+      tone(330, 0.12, 'square', 0.07, 0.02, 180);          // 重み
+      break;
+    // 魔法の主力弾: きらめく魔力チャージ + 発射のキラッ
+    case 'magicpro':
+      tone(420, 0.14, 'sine', 0.1, 0, 520);                // チャージ上昇
+      tone(1046, 0.1, 'triangle', 0.09, 0.06, 0);          // 発射の輝き
+      tone(1568, 0.14, 'sine', 0.07, 0.1, -300);           // きらめき
+      noise(0.06, 0.06, 0.05, 5000);                       // 弾けるエッジ
+      break;
+    // ピアスサイクロン: 旋風の唸り(短く繰り返し鳴らす)
+    case 'cyclone':
+      tone(300, 0.13, 'sawtooth', 0.1, 0, 260);
+      noise(0.13, 0.12, 0, 3200);
+      tone(900, 0.08, 'square', 0.05, 0.02, -200);
+      break;
   }
 }
 

@@ -3,7 +3,7 @@ import {
   CHARACTERS, FLOORS, TOTAL_FLOORS, GROUND_Y, WORLD_H, ARENA_W,
   expForLevel, newProgress, tierFor, tierIndexFor,
   atkScale, hpScale, mpScale, critRate, critMul, fmt, fmtBig, ELIXIR_MAX, LEVEL_CAP, REGEN_PCT_PER_SEC,
-  bossHp, bossAtk, bossExp, playerHitChance, playerDamageScale, enemyDamageScale, effReq,
+  bossHp, bossAtk, bossExp, playerHitChance, playerDamageScale, enemyDamageScale, effReq, stanceChance,
   loadSave, writeSave, themeTile, DIFFICULTIES,
   INFINITE_TIME, gaugeMax,
   type CharKey, type Progress, type FloorDef, type JobTier, type SkillDef,
@@ -831,25 +831,61 @@ export default class GameScene extends Phaser.Scene {
     if (skill.kind !== 'buff') this.playAttackAnim();
     this.skillNameFx(skill.name);
 
+    // 各段階の主力(一番弱い=spammableな)スキル[0]はカッコいい専用効果音
+    const primary = i === 0;
     switch (skill.kind) {
-      case 'melee': this.skMelee(skill); break;
+      case 'melee': this.skMelee(skill, primary); break;
       case 'aoe': this.skAoe(skill); break;
       case 'wave': this.skWave(skill); break;
       case 'rush': this.skRush(skill, now); break;
       case 'buff': this.skBuff(skill); break;
-      case 'projectile': this.skProjectile(skill); break;
+      case 'projectile': this.skProjectile(skill, primary); break;
       case 'thunder': this.skThunder(skill); break;
-      case 'freeze': this.skFreeze(skill); break;
+      case 'freeze': this.skFreeze(skill, primary); break;
+      case 'meteor': this.skMeteor(skill, primary); break;
       case 'chain': this.skChain(skill); break;
-      case 'meteor': this.skMeteor(skill); break;
       case 'nova': this.skNova(skill); break;
+      case 'channel': this.skChannel(skill); break;
       case 'heal': this.skHeal(skill); break;
     }
   }
 
+  // ピアスサイクロン: 5秒間うずを巻いて周囲に連続ダメージ(キーダウン継続)
+  private channelUntil = 0;
+  private skChannel(s: SkillDef) {
+    const dur = s.durMs ?? 5000;
+    const end = this.time.now + dur;
+    this.channelUntil = end;
+    sfx('cyclone');
+    const radius = s.range ?? 80;
+    // うずまきのビジュアル(回転するスラッシュ2枚)
+    const vortex1 = this.add.sprite(this.player.x, this.player.y, 'fx_slash_0').setDepth(12).setScale(2.6).setTint(0xb89aff).setAlpha(0.85);
+    const vortex2 = this.add.sprite(this.player.x, this.player.y, 'fx_slash_0').setDepth(12).setScale(2.6).setTint(0xff6ab0).setAlpha(0.7).setFlipX(true);
+    this.tweens.add({ targets: [vortex1, vortex2], angle: 360, duration: 350, repeat: -1 });
+    // ダメージ&演出のティック(約140ms毎)
+    let tick = 0;
+    const ev = this.time.addEvent({
+      delay: 140, loop: true,
+      callback: () => {
+        if (this.over || this.time.now >= end) { ev.remove(); vortex1.destroy(); vortex2.destroy(); return; }
+        vortex1.setPosition(this.player.x, this.player.y);
+        vortex2.setPosition(this.player.x, this.player.y);
+        if (tick % 3 === 0) sfx('cyclone');
+        tick++;
+        // 周囲の風の刃
+        const ang = Math.random() * Math.PI * 2;
+        const blade = this.add.image(this.player.x + Math.cos(ang) * radius * 0.7, this.player.y + Math.sin(ang) * radius * 0.7, 'fx_star_0')
+          .setDepth(13).setScale(1.1).setTint(0xd8b0ff);
+        this.tweens.add({ targets: blade, alpha: 0, scale: 0.3, duration: 220, onComplete: () => blade.destroy() });
+        this.aoeDamage(this.player.x, this.player.y, radius, s.mult, s.hits);
+      },
+    });
+    this.cameras.main.shake(120, 0.003);
+  }
+
   // ---- スキル実装 ----
-  private skMelee(s: SkillDef) {
-    sfx('slash');
+  private skMelee(s: SkillDef, primary = false) {
+    sfx(primary ? 'slashpro' : 'slash');
     const power = s.hits >= 5;
     this.meleeFx(1.2 + s.hits * 0.12);
     // 多段ぶんの槍/剣閃が前方へ連続して走る独創エフェクト
@@ -961,8 +997,8 @@ export default class GameScene extends Phaser.Scene {
       s.atkBuff ? '#ff7a5a' : '#7ab0ff');
   }
 
-  private skProjectile(s: SkillDef) {
-    sfx('fire');
+  private skProjectile(s: SkillDef, primary = false) {
+    sfx(primary ? 'magicpro' : 'fire');
     const tex = this.progress.charKey === 'mage' && s.name.includes('フローズン') ? 'fx_ice_0' : 'fx_fire_0';
     this.shoot(tex, s.speed ?? 240, s.mult, s.pierce ?? false, 280, 0.8 + s.hits * 0.18, s.hits);
     const flash = this.add.circle(this.player.x + this.facing * 14, this.player.y - 4, 6, 0x9ad8ff, 0.7).setDepth(12);
@@ -987,8 +1023,8 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  private skFreeze(s: SkillDef) {
-    sfx('thunder');
+  private skFreeze(s: SkillDef, primary = false) {
+    sfx(primary ? 'magicpro' : 'thunder');
     this.cameras.main.shake(140, 0.004);
     const radius = s.radius ?? 90;
     const cx = this.player.x + this.facing * 30, cy = this.player.y;
@@ -1029,8 +1065,8 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  private skMeteor(s: SkillDef) {
-    sfx('fire');
+  private skMeteor(s: SkillDef, primary = false) {
+    sfx(primary ? 'magicpro' : 'fire');
     this.cameras.main.shake(130, 0.0035);
     const isIce = s.name.includes('ブリザード');
     const b = this.boss;
@@ -1431,7 +1467,16 @@ export default class GameScene extends Phaser.Scene {
     this.floatText(this.player.x, this.player.y - 28, fmt(dmg), '#ff5a5a');
     this.player.setTintFill(0xff6a6a);
     this.cameras.main.shake(70, 0.0022);
-    this.player.setVelocityY(-110);
+    // ノックバック: 敵から離れる方向へ押される。スタンス成功時はのけぞらない
+    const resisted = Math.random() < stanceChance(this.progress.charKey, this.progress.level);
+    if (resisted) {
+      this.player.setVelocityY(-70);
+      this.floatText(this.player.x + 12, this.player.y - 40, 'STANCE', '#9ad8ff');
+    } else {
+      const src = this.boss && this.boss.active ? this.boss.x : this.player.x - this.facing * 10;
+      const kbDir = Math.sign(this.player.x - src) || -this.facing || 1;
+      this.player.setVelocity(kbDir * 150, -130);
+    }
     this.time.delayedCall(120, () => this.player.clearTint());
     this.tweens.add({ targets: this.player, alpha: 0.35, duration: 100, yoyo: true, repeat: 4, onComplete: () => this.player.setAlpha(1) });
 

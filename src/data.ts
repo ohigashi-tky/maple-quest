@@ -19,6 +19,7 @@ export type SkillKind =
   | 'chain'      // 連鎖雷
   | 'meteor'     // 隕石/ブリザード(降下多段)
   | 'nova'       // 全画面多段
+  | 'channel'    // キーダウン継続発動(ピアスサイクロン)
   | 'heal';      // 回復
 
 export interface SkillDef {
@@ -114,7 +115,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'w5a', name: 'ダークインペール', mp: 7, cd: 800, kind: 'melee', mult: 1.9, hits: 8, range: 70 },
           { id: 'w5b', name: 'ガングニールの咆哮', mp: 13, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
-          { id: 'w5c', name: 'リインカーネーション', mp: 17, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 13000, atkBuff: 1.8, defCut: 0.5 },
+          { id: 'w5c', name: 'ピアスサイクロン', mp: 14, cd: 2400, kind: 'channel', mult: 1.3, hits: 1, range: 84, durMs: 5000 },
         ],
       },
     ],
@@ -180,6 +181,14 @@ export function tierIndexFor(def: CharDef, level: number): number {
 }
 export function tierFor(def: CharDef, level: number): JobTier {
   return def.tiers[tierIndexFor(def, level)];
+}
+
+// スタンス: 被弾時にノックバックしない確率
+// 戦士: 転職ごとに+20%(1次20%〜5次100%) / 魔法使い: +10%(最大50%)
+export function stanceChance(charKey: CharKey, level: number): number {
+  const idx = tierIndexFor(CHARACTERS[charKey], level); // 0〜4
+  if (charKey === 'warrior') return Math.min(1, (idx + 1) * 0.2);
+  return Math.min(0.5, (idx + 1) * 0.1);
 }
 
 // ============================================================
