@@ -16,20 +16,34 @@ function computeViewH(): number {
 
 export const VIEW_H = computeViewH();
 
+// ホーム画面追加(スタンドアロンPWA)で起動しているか
+function isStandalone(): boolean {
+  try {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || (navigator as unknown as { standalone?: boolean }).standalone === true;
+  } catch { return false; }
+}
+
 // iPhoneのセーフエリア(ダイナミックアイランド/ステータスバー)を避けるための上部余白(ゲーム内座標)
 function computeSafeTop(): number {
+  let insetPx = 0;
   try {
+    // padding-top に env() を当てて computed style から確実に解決値(px)を読む
     const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:env(safe-area-inset-top,0px);pointer-events:none;';
+    probe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px);';
     document.body.appendChild(probe);
-    const px = probe.getBoundingClientRect().height;
+    insetPx = parseFloat(getComputedStyle(probe).paddingTop) || 0;
     probe.remove();
-    // 画面ピクセル→ゲーム内座標へ変換(縦は画面いっぱいに描画)
-    const units = px * VIEW_H / Math.max(1, window.innerHeight);
-    return Math.round(units);
-  } catch {
-    return 0;
+  } catch { /* ignore */ }
+
+  // スタンドアロン起動なのに env が取れない端末向けのフォールバック
+  // (ノッチ/ダイナミックアイランド相当の最低余白を確保)
+  if (isStandalone() && insetPx < 20) {
+    insetPx = Math.max(insetPx, 50);
   }
+  // 画面CSSピクセル→ゲーム内座標へ変換(縦は画面いっぱいに描画)
+  const units = insetPx * VIEW_H / Math.max(1, window.innerHeight);
+  return Math.round(units);
 }
 export const SAFE_TOP = computeSafeTop();
 
