@@ -1,12 +1,10 @@
 import Phaser from 'phaser';
 import { VIEW_W, VIEW_H, SAFE_TOP } from '../main';
 import { initAudio, playBgm, sfx, setMuted, isMuted } from '../audio';
-import { loadSave, writeSave, resetSave, newProgress, CHARACTERS, tierFor, type CharKey } from '../data';
+import { loadSave, writeSave, resetSave, newProgress, switchSaveChar, CHAR_KEYS, CHARACTERS, tierFor, tierIndexFor, type CharKey } from '../data';
 import { openFloorSelect } from '../ui/FloorSelect';
 
 export default class TitleScene extends Phaser.Scene {
-  private selectedClass: CharKey = 'warrior';
-  private classBtns: { key: CharKey; redraw: () => void }[] = [];
 
   constructor() {
     super('Title');
@@ -41,6 +39,7 @@ export default class TitleScene extends Phaser.Scene {
     // 5次職のドット絵を主役に
     this.add.sprite(cx - 78, VIEW_H - 88, 'warrior5_0').setScale(5).setOrigin(0.5, 1).play('warrior5_walk');
     this.add.sprite(cx + 78, VIEW_H - 88, 'mage5_0').setScale(5).setOrigin(0.5, 1).setFlipX(true).play('mage5_walk');
+    this.add.sprite(cx + 200, VIEW_H - 80, 'thief5_0').setScale(4.4).setOrigin(0.5, 1).setFlipX(true).play('thief5_walk');
     // ボス(ブラックマゲ風)を遠景に
     this.add.sprite(cx + 160, 360, 'boss_lord_0').setScale(2.2).setTint(0x2a1a3a).play('boss_lord_move').setAlpha(0.9);
 
@@ -65,22 +64,28 @@ export default class TitleScene extends Phaser.Scene {
     pg.lineStyle(2, 0xffb347, 0.8);
     pg.strokeRoundedRect(cx - 200, panelY - 36, 400, 96, 16);
     const maxFloor = Math.max(...save.highestByDiff);
-    this.selectedClass = save.charKey;
-    const jobName = tierFor(CHARACTERS[this.selectedClass], save.level).jobName;
-    const lvText = this.add.text(cx, panelY - 12, `Lv.${save.level}  ${jobName}`, {
+    const tier = tierFor(CHARACTERS[save.charKey], save.level);
+    // 現キャラのドット絵をパネル内に表示
+    this.add.sprite(cx - 160, panelY + 10, `${tier.spriteKey}_0`).setScale(2.6);
+    this.add.text(cx, panelY - 12, `Lv.${save.level}  ${tier.jobName}`, {
       fontFamily: '"Arial Black", sans-serif', fontSize: '26px', color: '#ffe9b0',
     }).setOrigin(0.5).setResolution(2);
-    this.add.text(cx, panelY + 28, maxFloor > 1
+    this.add.text(cx, panelY + 16, maxFloor > 1
       ? `最高到達: 第 ${maxFloor} 階 ${save.clears > 0 ? `(制覇 ${save.clears} 回)` : ''}`
       : 'はじめての挑戦', {
       fontFamily: 'sans-serif', fontSize: '18px', color: '#cfe0ff',
     }).setOrigin(0.5).setResolution(2);
+    this.add.text(cx, panelY + 44, '▼ タップでキャラ変更', {
+      fontFamily: 'sans-serif', fontSize: '14px', color: '#ffd24a',
+    }).setOrigin(0.5).setResolution(2);
+    // パネル全体をタップ可能に
+    this.add.zone(cx, panelY + 12, 400, 96).setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => { initAudio(); sfx('select'); this.openCharSelect(); });
 
     // 無限ボス(1分間の最大ダメージ計測)
-    this.selectedClass = 'warrior';
     this.makeButton(cx, VIEW_H - 552, '無限ボス', '1分間の最大ダメージに挑戦', 0xc24aa8, () => this.startInfinite());
-    // 戦士で挑戦(1階 EASY から)。ゲーム内で魔法使いに交代可能
-    this.makeButton(cx, VIEW_H - 464, '挑 戦', '戦士で第1階 EASY から', 0xff8a2a, () => this.start(1, 0));
+    // 挑戦(選択中のキャラで1階 EASY から)
+    this.makeButton(cx, VIEW_H - 464, '挑 戦', `${CHARACTERS[save.charKey].name}で第1階 EASY から`, 0xff8a2a, () => this.start(1, 0));
     // 階層をえらぶ(難易度・到達階層から)
     this.makeButton(cx, VIEW_H - 376, '階層をえらぶ', '到達階層・難易度を選択', 0x8a5ac4, () => {
       initAudio();
@@ -150,6 +155,69 @@ export default class TitleScene extends Phaser.Scene {
     return c;
   }
 
+  // キャラクター選択モーダル: キャラごとのLv/ジョブを表示して切り替え
+  private openCharSelect() {
+    const save = loadSave();
+    const cx = VIEW_W / 2, cy = VIEW_H / 2;
+    const c = this.add.container(0, 0).setDepth(300);
+    const dim = this.add.rectangle(cx, cy, VIEW_W, VIEW_H, 0x05030a, 0.82).setInteractive();
+    c.add(dim);
+    c.add(this.add.text(cx, cy - 250, 'キャラクターをえらぶ', {
+      fontFamily: '"Arial Black", sans-serif', fontSize: '30px', color: '#ffe9b0', stroke: '#3a2a5a', strokeThickness: 6,
+    }).setOrigin(0.5).setResolution(2));
+    c.add(this.add.text(cx, cy - 210, 'キャラごとにレベルが記録されます', {
+      fontFamily: 'sans-serif', fontSize: '15px', color: '#cfe0ff',
+    }).setOrigin(0.5).setResolution(2));
+
+    const colors: Record<CharKey, number> = { warrior: 0xc23a2a, mage: 0x3a5ac4, thief: 0x7a3acc };
+    const descs: Record<CharKey, string> = {
+      warrior: '近接・高耐久のダークナイト系列',
+      mage: '氷雷魔法のアークメイジ系列',
+      thief: '手裏剣と分身のナイトロード系列',
+    };
+    CHAR_KEYS.forEach((key, i) => {
+      const cp = key === save.charKey ? { level: save.level, exp: save.exp } : save.charLevels[key];
+      const tier = tierFor(CHARACTERS[key], cp.level);
+      const y = cy - 110 + i * 140;
+      const w = 420, h = 120;
+      const active = key === save.charKey;
+      const g = this.add.graphics();
+      g.fillStyle(0x1a1430, 0.92);
+      g.fillRoundedRect(cx - w / 2, y - h / 2, w, h, 16);
+      g.lineStyle(active ? 4 : 2, active ? 0xffd24a : colors[key], active ? 1 : 0.7);
+      g.strokeRoundedRect(cx - w / 2, y - h / 2, w, h, 16);
+      c.add(g);
+      const spr = this.add.sprite(cx - w / 2 + 56, y, `${tier.spriteKey}_0`).setScale(3.4);
+      if (this.anims.exists(`${tier.spriteKey}_walk`)) spr.play(`${tier.spriteKey}_walk`);
+      c.add(spr);
+      c.add(this.add.text(cx - w / 2 + 110, y - 34, `${CHARACTERS[key].name}`, {
+        fontFamily: '"Arial Black", sans-serif', fontSize: '24px', color: '#ffffff', stroke: '#2a1a30', strokeThickness: 4,
+      }).setOrigin(0, 0.5).setResolution(2));
+      c.add(this.add.text(cx - w / 2 + 110, y - 4, `Lv.${cp.level}  ${tier.jobName} (${tier.rankName})`, {
+        fontFamily: 'sans-serif', fontSize: '19px', fontStyle: 'bold', color: '#ffe9b0',
+      }).setOrigin(0, 0.5).setResolution(2));
+      c.add(this.add.text(cx - w / 2 + 110, y + 24, descs[key], {
+        fontFamily: 'sans-serif', fontSize: '13px', color: '#cfe0ff',
+      }).setOrigin(0, 0.5).setResolution(2));
+      if (active) {
+        c.add(this.add.text(cx + w / 2 - 16, y - h / 2 + 16, '選択中', {
+          fontFamily: 'sans-serif', fontSize: '14px', fontStyle: 'bold', color: '#ffd24a',
+        }).setOrigin(1, 0.5).setResolution(2));
+      }
+      const zone = this.add.zone(cx, y, w, h).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => {
+        sfx('select');
+        const sv = loadSave();
+        switchSaveChar(sv, key);
+        writeSave(sv);
+        c.destroy();
+        this.scene.restart();
+      });
+      c.add(zone);
+    });
+    c.add(this.makeSmallButton(cx, cy + 250, 'とじる', 0x6a6a8a, () => c.destroy()));
+  }
+
   // Lv1リセットの確認ダイアログ
   private confirmReset() {
     const cy = VIEW_H / 2;
@@ -169,29 +237,6 @@ export default class TitleScene extends Phaser.Scene {
       this.scene.restart();
     }));
     c.add(this.makeSmallButton(VIEW_W / 2, cy + 118, 'キャンセル', 0x6a6a8a, () => c.destroy()));
-  }
-
-  private makeClassToggle(x: number, y: number, key: CharKey, label: string, sub: string, color: number, onTap: (k: CharKey) => void) {
-    const w = 176, h = 66;
-    const c = this.add.container(x, y);
-    const g = this.add.graphics();
-    const spr = this.add.sprite(-w / 2 + 24, 0, `${key}_0`).setScale(2.4);
-    const t = this.add.text(8, -12, label, { fontFamily: 'sans-serif', fontSize: '20px', fontStyle: 'bold', color: '#ffffff', stroke: '#2a1a30', strokeThickness: 3 }).setOrigin(0.5).setResolution(2);
-    const st = this.add.text(8, 14, sub, { fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe9d0' }).setOrigin(0.5).setResolution(2);
-    c.add([g, spr, t, st]);
-    c.setSize(w, h).setInteractive({ useHandCursor: true });
-    const redraw = () => {
-      const active = this.selectedClass === key;
-      g.clear();
-      const col = Phaser.Display.Color.IntegerToColor(color);
-      g.fillStyle(col.clone().darken(active ? 0 : 45).color, active ? 1 : 0.7);
-      g.fillRoundedRect(-w / 2, -h / 2, w, h, 14);
-      if (active) { g.lineStyle(3, 0xffffff, 0.95); g.strokeRoundedRect(-w / 2, -h / 2, w, h, 14); }
-    };
-    c.on('pointerdown', () => { initAudio(); sfx('select'); onTap(key); });
-    redraw();
-    this.classBtns.push({ key, redraw });
-    return c;
   }
 
   private makeButton(x: number, y: number, label: string, sub: string, color: number, onTap: () => void) {
@@ -224,8 +269,6 @@ export default class TitleScene extends Phaser.Scene {
 
   private start(floor: number, difficulty: number) {
     const save = loadSave();
-    save.charKey = this.selectedClass;
-    writeSave(save);
     this.registry.set('progress', newProgress(save, floor, difficulty));
     this.cameras.main.fadeOut(350, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
@@ -237,8 +280,6 @@ export default class TitleScene extends Phaser.Scene {
   // 無限ボス(1分間の最大ダメージ計測)。今のレベル/ジョブで挑む
   private startInfinite() {
     const save = loadSave();
-    save.charKey = this.selectedClass;
-    writeSave(save);
     this.registry.set('progress', newProgress(save, 1, 0));
     this.cameras.main.fadeOut(350, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {

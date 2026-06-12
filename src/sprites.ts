@@ -241,6 +241,121 @@ const MAGE: SpriteDef = {
   ],
 };
 
+// ---------- 盗賊 (16x23): 鉢巻きと口元マスクの忍者 ----------
+const THIEF: SpriteDef = {
+  palette: {
+    h: '#7a3acc', H: '#5a28a0', n: '#9a5ae0',
+    s: '#ffdcb0', S: '#e8b98a', k: '#2a2118', m: '#3a3a5a', M: '#2a2a44',
+    b: '#2e2e4a', B: '#1e1e32', x: '#5a5a7a', o: '#4a3a2a', w: '#cfd6e8',
+  },
+  frames: [
+    // 0: stand
+    [
+      '.....hhhhhh.....',
+      '...hhhhhhhhhh...',
+      '..hhhhhhhhhhhh..',
+      '..hhHhhhhhHhhh..',
+      '..hhhhhhhhhhhhn.',
+      '..ssssssssssssnn',
+      '..ssssssssssss.n',
+      '..sskksssskkss..',
+      '..sskksssskkss..',
+      '..mmmmmmmmmmmm..',
+      '..SmmmmMMmmmmS..',
+      '...mmmmmmmmmm...',
+      '....bbbbbb......',
+      '...bbbbbbbb.....',
+      '..xxbbbbbbxx....',
+      '..xxbBbbBbxx....',
+      '...bbbbbbbb.....',
+      '...BBbbbbBB.....',
+      '....bbbbbb......',
+      '....bb..bb......',
+      '....bb..bb......',
+      '...oo....oo.....',
+      '...oo....oo.....',
+    ],
+    // 1: walk A
+    [
+      '.....hhhhhh.....',
+      '...hhhhhhhhhh...',
+      '..hhhhhhhhhhhh..',
+      '..hhHhhhhhHhhh..',
+      '..hhhhhhhhhhhhn.',
+      '..ssssssssssssnn',
+      '..ssssssssssss.n',
+      '..sskksssskkss..',
+      '..sskksssskkss..',
+      '..mmmmmmmmmmmm..',
+      '..SmmmmMMmmmmS..',
+      '...mmmmmmmmmm...',
+      '....bbbbbb......',
+      '...bbbbbbbb.....',
+      '..xxbbbbbbxx....',
+      '..xxbBbbBbxx....',
+      '...bbbbbbbb.....',
+      '...BBbbbbBB.....',
+      '....bbbbbb......',
+      '...bbb..bbb.....',
+      '..bb......bb....',
+      '..oo......oo....',
+      '.oo........oo...',
+    ],
+    // 2: walk B
+    [
+      '.....hhhhhh.....',
+      '...hhhhhhhhhh...',
+      '..hhhhhhhhhhhh..',
+      '..hhHhhhhhHhhh..',
+      '..hhhhhhhhhhhhn.',
+      '..ssssssssssssnn',
+      '..ssssssssssss.n',
+      '..sskksssskkss..',
+      '..sskksssskkss..',
+      '..mmmmmmmmmmmm..',
+      '..SmmmmMMmmmmS..',
+      '...mmmmmmmmmm...',
+      '....bbbbbb......',
+      '...bbbbbbbb.....',
+      '..xxbbbbbbxx....',
+      '..xxbBbbBbxx....',
+      '...bbbbbbbb.....',
+      '...BBbbbbBB.....',
+      '....bbbbbb......',
+      '....bbbbbb......',
+      '.....bbbb.......',
+      '....oo..oo......',
+      '....oo..oo......',
+    ],
+    // 3: attack (手裏剣を前へ投げる)
+    [
+      '.....hhhhhh.....',
+      '...hhhhhhhhhh...',
+      '..hhhhhhhhhhhh..',
+      '..hhHhhhhhHhhh..',
+      '..hhhhhhhhhhhhn.',
+      '..ssssssssssssnn',
+      '..ssssssssssss.n',
+      '..sskksssskkss..',
+      '..sskksssskkss..',
+      '..mmmmmmmmmmmm..',
+      '..SmmmmMMmmmmS..',
+      '...mmmmmmmmmm...',
+      '....bbbbbb......',
+      '...bbbbbbbbss...',
+      '..bbbbbbbbssxx..',
+      '..bbbBbbBbb.....',
+      '...bbbbbbbb.....',
+      '...BBbbbbBB.....',
+      '....bbbbbb......',
+      '...bb...bb......',
+      '...bb...bb......',
+      '..oo.....oo.....',
+      '..oo.....oo.....',
+    ],
+  ],
+};
+
 // ---------- ブルースネイル (14x11) ----------
 const SNAIL: SpriteDef = {
   palette: {
@@ -1931,11 +2046,133 @@ const WEAP_M5: SpriteDef = {
   ]],
 };
 
+// --- 盗賊の籠手(手の甲の爪鉤。転職ごとに大きく) ---
+const WEAP_T1: SpriteDef = {
+  palette: { a: '#dfe6f0', c: '#8a98b0', h: '#4a3a2a', H: '#32281c' },
+  frames: [[
+    '.a.a.', '.aca.', '.ccc.', '.hhh.', '.hHh.', '.hhh.',
+  ]],
+};
+const WEAP_T2: SpriteDef = {
+  palette: { a: '#bfeaff', c: '#5aa0d8', h: '#3a3a52', H: '#26263a' },
+  frames: [[
+    'a.a.a', 'acaca', '.ccc.', '.hhh.', '.hHh.', '.hhh.', '.hHh.',
+  ]],
+};
+const WEAP_T3: SpriteDef = {
+  palette: { a: '#fff0a0', c: '#e0a830', h: '#3a3a52', H: '#26263a' },
+  frames: [[
+    'a..a..a', '.a.a.a.', '.acacac', '..ccc..', '..hhh..', '..hHh..', '..hhh..', '..hHh..',
+  ]],
+};
+const WEAP_T4: SpriteDef = {
+  palette: { a: '#ffb05a', c: '#e05a1a', h: '#2a1a3a', H: '#1a1026' },
+  frames: [[
+    'a..a..a', 'aa.a.aa', '.acacac', '..ccc..', '..ccc..', '..hhh..', '..hHh..', '..hhh..', '..hHh..',
+  ]],
+};
+const WEAP_T5: SpriteDef = {
+  palette: { a: '#d88aff', c: '#8a2ae0', h: '#16101e', H: '#0c0814', w: '#f4e0ff' },
+  frames: [[
+    'a..w..a', 'aa.a.aa', '.acacac', '.accca.', '..ccc..', '..hhh..', '..hHh..', '..hhh..', '..hHh..', '..hhh..',
+  ]],
+};
+
+// --- 手裏剣(転職ごとに強化: 鉄→氷→雷→火→魔) ---
+const SHURIKEN1: SpriteDef = {
+  palette: { a: '#dfe6f0', c: '#8a98b0', k: '#3a4456' },
+  frames: [[
+    '....a....',
+    '....a....',
+    '...aca...',
+    '.aacccaa.',
+    'aacckccaa',
+    '.aacccaa.',
+    '...aca...',
+    '....a....',
+    '....a....',
+  ]],
+};
+const SHURIKEN2: SpriteDef = {
+  palette: { a: '#bfeaff', b: '#5ab0ff', B: '#2f7fd6', w: '#eaf8ff' },
+  frames: [[
+    '.....w.....',
+    '.a...b...a.',
+    '..a.bbb.a..',
+    '...abba....',
+    '.b.abbba.b.',
+    'wbbbbwbbbbw',
+    '.b.abbba.b.',
+    '...abba....',
+    '..a.bbb.a..',
+    '.a...b...a.',
+    '.....w.....',
+  ]],
+};
+const SHURIKEN3: SpriteDef = {
+  palette: { y: '#ffe45a', Y: '#e0a830', w: '#fffbe0', k: '#7a5a10' },
+  frames: [[
+    '.....w.....',
+    '..y..y..y..',
+    '...y.y.y...',
+    '....yyy....',
+    '.yy.yYy.yy.',
+    'wyyYYkYYyyw',
+    '.yy.yYy.yy.',
+    '....yyy....',
+    '...y.y.y...',
+    '..y..y..y..',
+    '.....w.....',
+  ]],
+};
+const SHURIKEN4: SpriteDef = {
+  palette: { r: '#ff5a2a', o: '#ffa02a', y: '#ffe45a', w: '#fff4d0' },
+  frames: [[
+    '......w......',
+    '..r...o...r..',
+    '...r..o..r...',
+    '....rooor....',
+    '.....oyo.....',
+    '.ro.oyyyo.or.',
+    'wooyyywyyyoow',
+    '.ro.oyyyo.or.',
+    '.....oyo.....',
+    '....rooor....',
+    '...r..o..r...',
+    '..r...o...r..',
+    '......w......',
+  ]],
+};
+const SHURIKEN5: SpriteDef = {
+  palette: { p: '#c84aff', P: '#7a1ae0', k: '#2a0a44', d: '#4a1080', w: '#f0d8ff' },
+  frames: [[
+    '.......d.......',
+    '...d...p...d...',
+    '..d.p..p..p.d..',
+    '...p.ppppp.p...',
+    '....ppPPPpp....',
+    '.....PkkkP.....',
+    '.dpp.PkwkP.ppd.',
+    'dpppPkwwwkPpppd',
+    '.dpp.PkwkP.ppd.',
+    '.....PkkkP.....',
+    '....ppPPPpp....',
+    '...p.ppppp.p...',
+    '..d.p..p..p.d..',
+    '...d...p...d...',
+    '.......d.......',
+  ]],
+};
+
 const SPRITES: Record<string, SpriteDef> = {
   warrior: WARRIOR,
   mage: MAGE,
+  thief: THIEF,
   weap_w1: WEAP_W1, weap_w2: WEAP_W2, weap_w3: WEAP_W3, weap_w4: WEAP_W4, weap_w5: WEAP_W5,
   weap_m1: WEAP_M1, weap_m2: WEAP_M2, weap_m3: WEAP_M3, weap_m4: WEAP_M4, weap_m5: WEAP_M5,
+  weap_t1: WEAP_T1, weap_t2: WEAP_T2, weap_t3: WEAP_T3, weap_t4: WEAP_T4, weap_t5: WEAP_T5,
+  fx_shuriken1: SHURIKEN1, fx_shuriken2: SHURIKEN2, fx_shuriken3: SHURIKEN3,
+  fx_shuriken4: SHURIKEN4, fx_shuriken5: SHURIKEN5,
   snail: SNAIL,
   mushroom: MUSHROOM,
   slime: SLIME,
@@ -2150,6 +2387,48 @@ const TIER_VARIANTS: TierVariant[] = [
     under: { rows: CAPE_ROWS, palette: { c: '#9ad8ff' } },
     over: { rows: CROWN_ROWS, palette: { g: '#ffe45a' } },
   },
+  // ===== 盗賊: ナイトロード系列 =====
+  // 2次 アサシン: 群青の装束 + 青鉢巻き
+  {
+    base: 'thief',
+    key: 'thief2',
+    palette: {
+      h: '#3a5ae0', H: '#2840a8', n: '#5a7af0', b: '#26263e', B: '#18182a', x: '#4a6ad8',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#2a3a8c' } },
+  },
+  // 3次 ハーミット: 白装束 + 灰青の防具
+  {
+    base: 'thief',
+    key: 'thief3',
+    palette: {
+      h: '#e8e8f4', H: '#b8b8d0', n: '#ffffff', b: '#3a3a52', B: '#26263a', x: '#cfd6e8',
+      m: '#4a4a66', M: '#36364e',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#9aa4c8' } },
+  },
+  // 4次 ナイトロード: 紫紺の装束 + 角付き頭巾 + 紫マント
+  {
+    base: 'thief',
+    key: 'thief4',
+    palette: {
+      h: '#8a3ae0', H: '#5a1aa0', n: '#b86aff', b: '#2a1a44', B: '#1a1030', x: '#7a3acc',
+      m: '#3a2a5a', M: '#2a1a44',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#4a1a80' } },
+    over: { rows: HORN_ROWS, palette: { d: '#b86aff' } },
+  },
+  // 5次 ナイトロード・極: 漆黒の装束に魔光 + 闇マント + 角
+  {
+    base: 'thief',
+    key: 'thief5',
+    palette: {
+      h: '#c84aff', H: '#8a1ae0', n: '#e8a4ff', b: '#16101e', B: '#0c0814', x: '#9a3ae0',
+      m: '#241a36', M: '#16101e', w: '#e8a4ff',
+    },
+    under: { rows: CAPE_ROWS, palette: { c: '#3a0a5a' } },
+    over: { rows: HORN_ROWS, palette: { d: '#c84aff' } },
+  },
 ];
 
 export function frameKeys(name: string): string[] {
@@ -2216,6 +2495,7 @@ export function createAllAnims(scene: Phaser.Scene) {
   for (const who of [
     'warrior', 'warrior2', 'warrior3', 'warrior4', 'warrior5',
     'mage', 'mage2', 'mage3', 'mage4', 'mage5',
+    'thief', 'thief2', 'thief3', 'thief4', 'thief5',
   ]) {
     mk(`${who}_stand`, who, [0], 1);
     mk(`${who}_walk`, who, [1, 0, 2, 0], 10);

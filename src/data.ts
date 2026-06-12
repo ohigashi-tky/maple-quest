@@ -4,7 +4,7 @@
 // レベルは永続化され、自分の強さでどこまで登れるかに挑戦する。
 // ============================================================
 
-export type CharKey = 'warrior' | 'mage';
+export type CharKey = 'warrior' | 'mage' | 'thief';
 
 // スキル種別(多段ヒット対応)
 export type SkillKind =
@@ -24,6 +24,7 @@ export type SkillKind =
   | 'breath'     // キーダウン氷ブレス(無敵+減速デバフ)
   | 'gungnir'    // 神槍投擲(最大HP比例の多段)
   | 'summon'     // 召喚獣(エルクィネス/ダークスピリット)
+  | 'shadow'     // シャドーパートナー(分身が攻撃を反復)
   | 'heal';      // 回復
 
 export interface SkillDef {
@@ -178,6 +179,61 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       },
     ],
   },
+  // ========== 盗賊: ナイトロード系列(盗賊→アサシン→ハーミット→ナイトロード) ==========
+  // 手裏剣を投げる忍者。転職ごとに手裏剣が強化(鉄→氷→雷→火→魔)され攻撃回数も増える。
+  // 2次からシャドーパートナー(分身)を召喚: 攻撃力50%で攻撃を反復。
+  // 体数は2次1体/3次2体/4次3体/5次4体(1体増えるごとに分身の攻撃力-10%)。
+  thief: {
+    key: 'thief',
+    name: '盗賊',
+    maxhp: 300,
+    maxmp: 160,
+    atk: 22,
+    speed: 132,
+    jump: 345,
+    tiers: [
+      {
+        minLevel: 1, jobName: '盗賊', rankName: '1次', spriteKey: 'thief', atkBonus: 1,
+        skills: [
+          { id: 't1a', name: 'ラッキーセブン', mp: 2, cd: 700, kind: 'projectile', mult: 1.5, hits: 2, speed: 300, pierce: false },
+          { id: 't1b', name: 'ダブルスタブ', mp: 2, cd: 1200, kind: 'melee', mult: 1.5, hits: 2, range: 38 },
+          { id: 't1c', name: 'ニンブルボディ', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.55 },
+        ],
+      },
+      {
+        minLevel: 10, jobName: 'アサシン', rankName: '2次', spriteKey: 'thief2', atkBonus: 1.25,
+        skills: [
+          { id: 't2a', name: 'クイックスロー', mp: 2, cd: 750, kind: 'projectile', mult: 1.5, hits: 3, speed: 320, pierce: false },
+          { id: 't2b', name: 'シャドーウェブ', mp: 3, cd: 1600, kind: 'freeze', mult: 1.4, hits: 2, radius: 80, durMs: 900 },
+          { id: 't2c', name: 'シャドーパートナー', mp: 5, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 1, durMs: 30000 },
+        ],
+      },
+      {
+        minLevel: 30, jobName: 'ハーミット', rankName: '3次', spriteKey: 'thief3', atkBonus: 1.55,
+        skills: [
+          { id: 't3a', name: 'アバンジャー', mp: 3, cd: 900, kind: 'projectile', mult: 1.7, hits: 4, speed: 300, pierce: true },
+          { id: 't3b', name: 'シャドーメソ', mp: 3, cd: 1700, kind: 'aoe', mult: 1.6, hits: 4, radius: 92 },
+          { id: 't3c', name: 'シャドーパートナー', mp: 5, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 2, durMs: 30000 },
+        ],
+      },
+      {
+        minLevel: 60, jobName: 'ナイトロード', rankName: '4次', spriteKey: 'thief4', atkBonus: 2.0,
+        skills: [
+          { id: 't4a', name: 'トリプルスロー', mp: 3, cd: 850, kind: 'projectile', mult: 1.6, hits: 6, speed: 340, pierce: false },
+          { id: 't4b', name: 'ショーダウン', mp: 4, cd: 1800, kind: 'aoe', mult: 1.8, hits: 6, radius: 104 },
+          { id: 't4c', name: 'シャドーパートナー', mp: 6, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 3, durMs: 30000 },
+        ],
+      },
+      {
+        minLevel: 100, jobName: 'ナイトロード・極', rankName: '5次', spriteKey: 'thief5', atkBonus: 2.6,
+        skills: [
+          { id: 't5a', name: 'クアドラプルスロー', mp: 3, cd: 800, kind: 'projectile', mult: 1.7, hits: 8, speed: 360, pierce: false },
+          { id: 't5b', name: 'スプレッドスロー', mp: 5, cd: 2200, kind: 'nova', mult: 1.8, hits: 7 },
+          { id: 't5c', name: 'シャドーパートナー', mp: 7, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 4, durMs: 30000 },
+        ],
+      },
+    ],
+  },
 };
 
 export function tierIndexFor(def: CharDef, level: number): number {
@@ -194,6 +250,7 @@ export function tierFor(def: CharDef, level: number): JobTier {
 export function stanceChance(charKey: CharKey, level: number): number {
   const idx = tierIndexFor(CHARACTERS[charKey], level); // 0〜4
   if (charKey === 'warrior') return Math.min(1, (idx + 1) * 0.2);
+  if (charKey === 'thief') return Math.min(0.75, (idx + 1) * 0.15);
   return Math.min(0.5, (idx + 1) * 0.1);
 }
 
@@ -397,10 +454,13 @@ export interface Progress {
 
 export const ELIXIR_MAX = 30;
 
+export interface CharProgress { level: number; exp: number; }
+
 export interface SaveData {
-  level: number;
-  exp: number;
+  level: number;       // 現在選択中キャラのレベル
+  exp: number;         // 現在選択中キャラの経験値
   charKey: CharKey;
+  charLevels: Record<CharKey, CharProgress>;  // キャラごとの成長記録
   highestByDiff: number[];   // 難易度別の到達最高階層
   clearedByDiff: boolean[];  // 難易度別の20階制覇フラグ
   clears: number;
@@ -408,9 +468,12 @@ export interface SaveData {
 
 const SAVE_KEY = 'maple-quest-save-v3';
 
+export const CHAR_KEYS: CharKey[] = ['warrior', 'mage', 'thief'];
+
 function defaultSave(): SaveData {
   return {
     level: 1, exp: 0, charKey: 'warrior',
+    charLevels: { warrior: { level: 1, exp: 0 }, mage: { level: 1, exp: 0 }, thief: { level: 1, exp: 0 } },
     highestByDiff: [1, 1, 1, 1],
     clearedByDiff: [false, false, false, false],
     clears: 0,
@@ -423,10 +486,22 @@ export function loadSave(): SaveData {
     if (raw) {
       const s = JSON.parse(raw) as Partial<SaveData>;
       const d = defaultSave();
+      const charKey: CharKey = s.charKey === 'mage' ? 'mage' : s.charKey === 'thief' ? 'thief' : 'warrior';
+      const level = Math.max(1, Math.min(LEVEL_CAP, s.level || 1));
+      const exp = Math.max(0, s.exp || 0);
+      // キャラ別レベル(旧セーブからの移行: 現キャラに既存Lvを引き継ぎ、他はLv1)
+      const cl = d.charLevels;
+      const rawCl = s.charLevels as Partial<Record<CharKey, Partial<CharProgress>>> | undefined;
+      if (rawCl) {
+        for (const k of CHAR_KEYS) {
+          const e = rawCl[k];
+          if (e) cl[k] = { level: Math.max(1, Math.min(LEVEL_CAP, e.level || 1)), exp: Math.max(0, e.exp || 0) };
+        }
+      }
+      cl[charKey] = { level, exp };  // 選択中キャラは常にトップレベルの値が正
       return {
-        level: Math.max(1, Math.min(LEVEL_CAP, s.level || 1)),
-        exp: Math.max(0, s.exp || 0),
-        charKey: s.charKey === 'mage' ? 'mage' : 'warrior',
+        level, exp, charKey,
+        charLevels: cl,
         highestByDiff: Array.isArray(s.highestByDiff) ? DIFFICULTIES.map((_, i) => Math.max(1, Math.min(TOTAL_FLOORS, s.highestByDiff![i] || 1))) : d.highestByDiff,
         clearedByDiff: Array.isArray(s.clearedByDiff) ? DIFFICULTIES.map((_, i) => !!s.clearedByDiff![i]) : d.clearedByDiff,
         clears: s.clears || 0,
@@ -434,6 +509,16 @@ export function loadSave(): SaveData {
     }
   } catch { /* ignore */ }
   return defaultSave();
+}
+
+// タイトル画面でのキャラ切り替え: 現キャラの成長を保存し、新キャラの成長を読み込む
+export function switchSaveChar(save: SaveData, key: CharKey): SaveData {
+  if (key === save.charKey) return save;
+  save.charLevels[save.charKey] = { level: save.level, exp: save.exp };
+  save.charKey = key;
+  save.level = save.charLevels[key].level;
+  save.exp = save.charLevels[key].exp;
+  return save;
 }
 
 // Lv1からやり直す(全進行をリセット)
@@ -463,6 +548,7 @@ export function newProgress(save: SaveData, floor = 1, difficulty = 0): Progress
     chars: {
       warrior: { hp: hpScale(CHARACTERS.warrior.maxhp, save.level), mp: mpScale(CHARACTERS.warrior.maxmp, save.level) },
       mage: { hp: hpScale(CHARACTERS.mage.maxhp, save.level), mp: mpScale(CHARACTERS.mage.maxmp, save.level) },
+      thief: { hp: hpScale(CHARACTERS.thief.maxhp, save.level), mp: mpScale(CHARACTERS.thief.maxmp, save.level) },
     },
     elixirs: 12,
     startTime: Date.now(),

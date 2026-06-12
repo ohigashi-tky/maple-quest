@@ -47,8 +47,6 @@ export default class HudScene extends Phaser.Scene {
 
   private skillBtns: Btn[] = [];
   private potionHpBtn!: Btn; // エリクサーボタン
-  private switchBtn!: Btn;
-  private switchIcon!: Phaser.GameObjects.Sprite;
 
   private banner?: Phaser.GameObjects.Container;
   private overlay?: Phaser.GameObjects.Container;
@@ -138,8 +136,6 @@ export default class HudScene extends Phaser.Scene {
     this.critText.setText(crit);
     const tex = `${ui.spriteKey}_0`;
     if (this.portraitIcon.texture.key !== tex) this.portraitIcon.setTexture(tex);
-    const otherTex = `${ui.otherSpriteKey}_0`;
-    if (this.switchIcon && this.switchIcon.texture.key !== otherTex) this.switchIcon.setTexture(otherTex);
   }
 
   flashMp() {
@@ -497,12 +493,6 @@ export default class HudScene extends Phaser.Scene {
     // エリクサー(HP/MP全回復・1種)
     this.potionHpBtn = this.makeButton(232, VIEW_H - 246, { r: 34, color: 0xd8930f, icon: 'elixir_0', iconScale: 2.4, sub: '0' }, () => game().useElixir());
 
-    // キャラ交代(攻撃ボタンの上に間隔を開けて配置 → 押し分けやすく)
-    this.switchBtn = this.makeButton(498, VIEW_H - 210, { r: 30, color: 0x4aa84a, label: '' }, () => game().switchChar());
-    this.switchIcon = this.add.sprite(498, VIEW_H - 212, 'mage_0').setScale(1.9);
-    this.add.text(498, VIEW_H - 236, '交代', {
-      fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#ffffff', stroke: '#1a3d1a', strokeThickness: 3,
-    }).setOrigin(0.5).setResolution(2);
   }
 
   refreshSkillButtons() {
@@ -707,6 +697,5 @@ export default class HudScene extends Phaser.Scene {
     if (this.potionHpBtn.sub) this.potionHpBtn.sub.setText(String(ui.elixirs));
     this.drawCooldown(this.potionHpBtn, ui.elixirCdLeft, 6000);
     this.potionHpBtn.container.setAlpha(ui.elixirs > 0 && ui.elixirCdLeft <= 0 ? 1 : 0.55);
-    this.drawCooldown(this.switchBtn, ui.switchCdLeft, 2000);
   }
 }

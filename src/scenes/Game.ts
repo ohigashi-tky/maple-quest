@@ -25,7 +25,6 @@ export interface UiState {
   charName: string;
   rankName: string;
   spriteKey: string;
-  otherSpriteKey: string;
   hp: number; maxhp: number;
   mp: number; maxmp: number;
   level: number;
@@ -39,9 +38,7 @@ export interface UiState {
   underLeveled: boolean;
   boss: { name: string; title: string; hp: number; max: number } | null;
   skills: { name: string; mp: number; cdLeft: number; cd: number }[];
-  switchCdLeft: number;
   elixirCdLeft: number;
-  otherCharKey: CharKey;
   gameOver: boolean;
   // 無限ボスモード
   infinite: boolean;
@@ -95,18 +92,21 @@ export default class GameScene extends Phaser.Scene {
   private upPrev = false;
   private attackCdAt = 0;
   private skillCdAt: number[] = [0, 0, 0];
-  private switchCdAt = 0;
   private invulnUntil = 0;
   private elixirCdUntil = 0;
   private buffs: Record<CharKey, { atk: number; def: number; hp: number; cd: number; until: number; name: string }> = {
     warrior: { atk: 1, def: 1, hp: 1, cd: 1, until: 0, name: '' },
     mage: { atk: 1, def: 1, hp: 1, cd: 1, until: 0, name: '' },
+    thief: { atk: 1, def: 1, hp: 1, cd: 1, until: 0, name: '' },
   };
   // 召喚獣が付与する一時バフ(攻撃/防御/クリティカル)
   private sumBuff = { atk: 1, def: 1, crit: 0, until: 0 };
   private inputLockUntil = 0;  // フリージングブレス等で行動不能
   // 召喚獣(エルクィネス/ダークスピリット)。再詠唱で作り直す
   private summons: Record<string, { sprite: Phaser.GameObjects.Sprite; endAt: number; ev: Phaser.Time.TimerEvent }> = {};
+  // シャドーパートナー(盗賊): 分身が本体の攻撃を反復する
+  private shadowUntil = 0;
+  private shadowSprites: Phaser.GameObjects.Sprite[] = [];
   private boss: BossSprite | null = null;
   private portal: Phaser.Physics.Arcade.Sprite | null = null;
   private over = false;
@@ -123,12 +123,13 @@ export default class GameScene extends Phaser.Scene {
     this.facing = 1;
     this.attackCdAt = 0;
     this.skillCdAt = [0, 0, 0];
-    this.switchCdAt = 0;
     this.invulnUntil = 0;
     this.elixirCdUntil = 0;
     this.inputLockUntil = 0;
     this.sumBuff = { atk: 1, def: 1, crit: 0, until: 0 };
     this.summons = {};
+    this.shadowUntil = 0;
+    this.shadowSprites = [];
     this.boss = null;
     this.portal = null;
     this.over = false;
@@ -195,7 +196,7 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(1100, () => this.spawnBoss());
     }
 
-    this.events.on('shutdown', () => { this.tweens.killAll(); this.clearSummons(); });
+    this.events.on('shutdown', () => { this.tweens.killAll(); this.clearSummons(); this.clearShadows(); });
   }
 
   hud(): HudScene | null {
@@ -424,7 +425,6 @@ export default class GameScene extends Phaser.Scene {
       charName: tier.jobName,
       rankName: tier.rankName,
       spriteKey: tier.spriteKey,
-      otherSpriteKey: this.otherCharSpriteKey(),
       hp: this.charState.hp,
       maxhp: this.maxHp(def.key),
       mp: this.charState.mp,
@@ -441,9 +441,7 @@ export default class GameScene extends Phaser.Scene {
       underLeveled: this.progress.level < this.er(this.floor),
       boss: null,
       skills: tier.skills.map((s) => ({ name: s.name, mp: this.skillMpCost(s), cdLeft: 0, cd: s.cd })),
-      switchCdLeft: 0,
       elixirCdLeft: 0,
-      otherCharKey: def.key === 'warrior' ? 'mage' : 'warrior',
       gameOver: false,
       infinite: this.infinite,
       infGauge: this.inf.gauge,
@@ -479,15 +477,16 @@ export default class GameScene extends Phaser.Scene {
   // 現在の武器テクスチャキー(転職ティアに応じて1〜5)
   private get weaponKey(): string {
     const idx = tierIndexFor(this.charDef, this.progress.level) + 1;
-    return `weap_${this.progress.charKey === 'warrior' ? 'w' : 'm'}${idx}`;
+    const p = this.progress.charKey === 'warrior' ? 'w' : this.progress.charKey === 'mage' ? 'm' : 't';
+    return `weap_${p}${idx}`;
+  }
+  // 盗賊の手裏剣テクスチャ(転職ごとに 鉄→氷→雷→火→魔)
+  private get shurikenTex(): string {
+    return `fx_shuriken${tierIndexFor(this.charDef, this.progress.level) + 1}_0`;
   }
   // ティアが上がるほど武器を大きく表示
   private get weaponScale(): number {
     return 1.0 + tierIndexFor(this.charDef, this.progress.level) * 0.16;
-  }
-  private otherCharSpriteKey(): string {
-    const other: CharKey = this.progress.charKey === 'warrior' ? 'mage' : 'warrior';
-    return tierFor(CHARACTERS[other], this.progress.level).spriteKey;
   }
   // 現在の難易度での実効推奨レベル(敵の強さ基準)
   private er(f: FloorDef): number { return effReq(f, this.progress.difficulty); }
@@ -519,6 +518,8 @@ export default class GameScene extends Phaser.Scene {
     b.setCollideWorldBounds(true);  // 巨大ボスが画面外に出ないように
     const bw = b.width * 0.6, bh = b.height * 0.75;
     b.setSize(bw, bh).setOffset((b.width - bw) / 2, b.height - bh);
+    // 巨大ボスはスポーン位置が低いと地面をすり抜けて埋まるため、スケール確定後に下端を地面の上へ合わせる
+    if (!flying) b.y = GROUND_Y - b.displayHeight / 2 - 6;
     if (flying) (b.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
     else this.physics.add.collider(b, this.platforms);
     this.boss = b;
@@ -869,6 +870,9 @@ export default class GameScene extends Phaser.Scene {
       sfx('slash');
       this.meleeFx();
       this.meleeHit(34, 1.0, 1);
+    } else if (this.progress.charKey === 'thief') {
+      sfx('claw');
+      this.shoot(this.shurikenTex, 300, 1.0, false, 90, 1, 1, true);
     } else {
       sfx('claw');
       this.clawFx();
@@ -912,6 +916,7 @@ export default class GameScene extends Phaser.Scene {
       case 'breath': this.skBreath(skill); break;
       case 'gungnir': this.skGungnir(skill); break;
       case 'summon': this.skSummon(skill); break;
+      case 'shadow': this.skShadow(skill); break;
       case 'heal': this.skHeal(skill); break;
     }
   }
@@ -1051,6 +1056,56 @@ export default class GameScene extends Phaser.Scene {
         this.hitEnemy(b, s.mult, 1, false, bonus);
       });
     }
+  }
+
+  // シャドーパートナー: 自分の後ろに分身を呼び出す(本体の攻撃を反復)
+  private skShadow(s: SkillDef) {
+    sfx('portal');
+    const count = s.targets ?? 1;
+    this.clearShadows();
+    this.shadowUntil = this.time.now + (s.durMs ?? 30000);
+    for (let i = 0; i < count; i++) {
+      const spr = this.add.sprite(this.player.x - this.facing * 10 * (i + 1), this.player.y, `${this.spriteKey}_0`)
+        .setDepth(9 - i * 0.1)
+        .setAlpha(0)
+        .setTintFill(0x2a1a4a);
+      this.shadowSprites.push(spr);
+      this.tweens.add({ targets: spr, alpha: 0.55 - i * 0.06, duration: 300, delay: i * 90 });
+    }
+    // 召喚演出: 闇のリング
+    const ring = this.add.circle(this.player.x, this.player.y, 10, 0x7a3acc, 0.55).setDepth(12);
+    this.tweens.add({ targets: ring, radius: 40, alpha: 0, duration: 480, onUpdate: () => ring.setRadius(ring.radius), onComplete: () => ring.destroy() });
+    this.floatText(this.player.x, this.player.y - 50, `シャドーパートナー×${count}!`, '#c8a4ff');
+  }
+
+  private clearShadows() {
+    for (const s of this.shadowSprites) s.destroy();
+    this.shadowSprites = [];
+    this.shadowUntil = 0;
+  }
+
+  // 分身: 本体の少し後ろを追従し、姿勢(テクスチャ/向き)をコピー
+  private updateShadows() {
+    if (!this.shadowSprites.length) return;
+    if (this.time.now >= this.shadowUntil) {
+      for (const s of this.shadowSprites) this.tweens.add({ targets: s, alpha: 0, duration: 300, onComplete: () => s.destroy() });
+      this.shadowSprites = [];
+      return;
+    }
+    this.shadowSprites.forEach((s, i) => {
+      const tx = this.player.x - this.facing * 11 * (i + 1);
+      const ty = this.player.y;
+      s.x += (tx - s.x) * 0.25;
+      s.y += (ty - s.y) * 0.5;
+      s.setTexture(this.player.texture.key);
+      s.setFlipX(this.player.flipX);
+      s.setVisible(this.player.visible);
+    });
+  }
+
+  // 分身の攻撃力倍率: 50%から1体増えるごとに-10%(2体40%/3体30%/4体20%)
+  private shadowMul(): number {
+    return Math.max(0.1, 0.5 - (this.shadowSprites.length - 1) * 0.1);
   }
 
   // 召喚: エルクィネス(氷の鳥) / ダークスピリット(黒い魂)
@@ -1267,6 +1322,19 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private skProjectile(s: SkillDef, primary = false) {
+    if (this.progress.charKey === 'thief') {
+      // 手裏剣投擲: 多段ぶんを時間差で連投(回転付き)
+      sfx(primary ? 'slashpro' : 'claw');
+      const throws = Math.min(4, Math.max(1, Math.ceil(s.hits / 2)));
+      const hitsPer = Math.ceil(s.hits / throws);
+      for (let k = 0; k < throws; k++) {
+        this.time.delayedCall(k * 80, () => {
+          if (this.over) return;
+          this.shoot(this.shurikenTex, s.speed ?? 300, s.mult, s.pierce ?? false, 280, 0.9 + s.hits * 0.08, hitsPer, true);
+        });
+      }
+      return;
+    }
     sfx(primary ? 'magicpro' : 'fire');
     const tex = this.progress.charKey === 'mage' && s.name.includes('フローズン') ? 'fx_ice_0' : 'fx_fire_0';
     this.shoot(tex, s.speed ?? 240, s.mult, s.pierce ?? false, 280, 0.8 + s.hits * 0.18, s.hits);
@@ -1462,28 +1530,6 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: ring, radius: 40, alpha: 0, duration: 500, onUpdate: () => ring.setRadius(ring.radius), onComplete: () => ring.destroy() });
   }
 
-  switchChar() {
-    if (this.over || this.transitioning) return;
-    const now = this.time.now;
-    if (now < this.switchCdAt) return;
-    const other: CharKey = this.progress.charKey === 'warrior' ? 'mage' : 'warrior';
-    if (this.progress.chars[other].hp <= 0) {
-      sfx('denied');
-      this.hud()?.showBanner(`${CHARACTERS[other].name}は倒れている!`, '#ff8a8a');
-      return;
-    }
-    this.switchCdAt = now + 2000;
-    this.progress.charKey = other;
-    this.skillCdAt = [0, 0, 0];
-    sfx('switch');
-    const fx = this.add.circle(this.player.x, this.player.y, 16, 0xffffff, 0.7).setDepth(12);
-    this.tweens.add({ targets: fx, radius: 30, alpha: 0, duration: 300, onUpdate: () => fx.setRadius(fx.radius), onComplete: () => fx.destroy() });
-    this.player.setTexture(`${this.spriteKey}_0`);
-    this.player.play(`${this.spriteKey}_stand`);
-    this.refreshWeapon();
-    this.buildUiState();
-  }
-
   // ============================================================
   // 攻撃判定
   // ============================================================
@@ -1528,7 +1574,7 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  private shoot(tex: string, speed: number, mult: number, pierce: boolean, rangeMs: number, scale: number, hits: number) {
+  private shoot(tex: string, speed: number, mult: number, pierce: boolean, rangeMs: number, scale: number, hits: number, spin = false) {
     const shot = this.playerShots.create(
       this.player.x + this.facing * 10, this.player.y - 4, tex
     ) as Phaser.Physics.Arcade.Sprite & { mult: number; pierce: boolean; hits: number; hitSet: Set<BossSprite> };
@@ -1536,13 +1582,26 @@ export default class GameScene extends Phaser.Scene {
     shot.setFlipX(this.facing < 0);
     shot.setDepth(11);
     shot.setScale(scale);
+    if (spin) (shot.body as Phaser.Physics.Arcade.Body).setAngularVelocity(this.facing * 720);  // 手裏剣回転
     shot.mult = mult; shot.pierce = pierce; shot.hits = hits; shot.hitSet = new Set();
     this.time.delayedCall(rangeMs * 4, () => shot.active && shot.destroy());
   }
 
   // 多段ヒット + MISS判定 + レベル差補正
-  private hitEnemy(e: BossSprite, mult: number, hits: number, flat = false, bonusDmg = 0) {
+  private hitEnemy(e: BossSprite, mult: number, hits: number, flat = false, bonusDmg = 0, shadowEcho = true) {
     if (!e.active || e.dying) return;
+    // シャドーパートナー: 分身が本体の攻撃を反復(体数ぶん追撃)
+    if (shadowEcho && this.shadowSprites.length > 0 && this.time.now < this.shadowUntil) {
+      const sm = this.shadowMul();
+      this.shadowSprites.forEach((spr, c) => {
+        this.time.delayedCall(110 + c * 70, () => {
+          if (!e.active || e.dying || this.over) return;
+          this.hitEnemy(e, mult * sm, hits, flat, 0, false);
+          // 分身が一瞬前へ踏み込む演出
+          this.tweens.add({ targets: spr, x: spr.x + this.facing * 8, duration: 80, yoyo: true });
+        });
+      });
+    }
     // 無限ボス: MISSなし・格上補正なし(自分の素の火力を計測)
     const hitChance = this.infinite ? 1 : playerHitChance(this.progress.level, this.er(e.floor));
     const dmgScale = this.infinite ? 1 : playerDamageScale(this.progress.level, this.er(e.floor));
@@ -1754,14 +1813,7 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: this.player, alpha: 0.35, duration: 100, yoyo: true, repeat: 4, onComplete: () => this.player.setAlpha(1) });
 
     if (this.charState.hp <= 0) {
-      const other: CharKey = this.progress.charKey === 'warrior' ? 'mage' : 'warrior';
-      if (this.progress.chars[other].hp > 0) {
-        this.hud()?.showBanner(`${this.charDef.name}が倒れた! ${CHARACTERS[other].name}に交代!`, '#ff8a8a');
-        this.switchCdAt = 0;
-        this.switchChar();
-      } else {
-        this.gameOver();
-      }
+      this.gameOver();
     }
   }
 
@@ -1780,7 +1832,7 @@ export default class GameScene extends Phaser.Scene {
 
   // 指定の階層・難易度から再挑戦(レベルは保持)
   retryFloor(floor: number, difficulty: number) {
-    for (const k of ['warrior', 'mage'] as CharKey[]) {
+    for (const k of ['warrior', 'mage', 'thief'] as CharKey[]) {
       this.progress.chars[k].hp = this.maxHp(k);
       this.progress.chars[k].mp = this.maxMp(k);
     }
@@ -1800,7 +1852,7 @@ export default class GameScene extends Phaser.Scene {
       this.progress.level++;
       next = expForLevel(this.progress.level);
       sfx('levelup');
-      for (const k of ['warrior', 'mage'] as CharKey[]) {
+      for (const k of ['warrior', 'mage', 'thief'] as CharKey[]) {
         this.progress.chars[k].hp = this.maxHp(k);
         this.progress.chars[k].mp = this.maxMp(k);
       }
@@ -1867,6 +1919,7 @@ export default class GameScene extends Phaser.Scene {
     this.updateShots();
     this.updatePickups();
     this.updateSummons();
+    this.updateShadows();
     this.updateWeapon();
     if (!this.infinite) this.updatePortal();
     this.syncUiState();
@@ -1923,9 +1976,15 @@ export default class GameScene extends Phaser.Scene {
   private updateRegen(delta: number) {
     const dt = delta / 1000;
     const st = this.charState;
-    if (this.progress.charKey === 'warrior') {
+    const key = this.progress.charKey;
+    if (key === 'warrior') {
       const max = this.maxHp('warrior');
       if (st.hp < max) st.hp = Math.min(max, st.hp + max * REGEN_PCT_PER_SEC * dt);
+    } else if (key === 'thief') {
+      // 盗賊はHP/MP両方を半分の速度で回復
+      const maxHp = this.maxHp('thief'), maxMp = this.maxMp('thief');
+      if (st.hp < maxHp) st.hp = Math.min(maxHp, st.hp + maxHp * REGEN_PCT_PER_SEC * 0.5 * dt);
+      if (st.mp < maxMp) st.mp = Math.min(maxMp, st.mp + maxMp * REGEN_PCT_PER_SEC * 0.5 * dt);
     } else {
       const max = this.maxMp('mage');
       if (st.mp < max) st.mp = Math.min(max, st.mp + max * REGEN_PCT_PER_SEC * dt);
@@ -1965,7 +2024,6 @@ export default class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.S)) this.doSkill(1);
     if (Phaser.Input.Keyboard.JustDown(this.keys.D)) this.doSkill(2);
     if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) this.useElixir();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.E)) this.switchChar();
 
     const animKey = this.player.anims.currentAnim?.key ?? '';
     if (!animKey.endsWith('_attack')) {
@@ -2136,7 +2194,6 @@ export default class GameScene extends Phaser.Scene {
     ui.charName = tier.jobName;
     ui.rankName = tier.rankName;
     ui.spriteKey = tier.spriteKey;
-    ui.otherSpriteKey = this.otherCharSpriteKey();
     ui.hp = Math.ceil(this.charState.hp);
     ui.maxhp = this.maxHp(def.key);
     ui.mp = Math.floor(this.charState.mp);
@@ -2162,8 +2219,6 @@ export default class GameScene extends Phaser.Scene {
       name: s.name, mp: this.skillMpCost(s),
       cdLeft: Math.max(0, this.skillCdAt[i] - now), cd: s.cd,
     }));
-    ui.switchCdLeft = Math.max(0, this.switchCdAt - now);
-    ui.otherCharKey = def.key === 'warrior' ? 'mage' : 'warrior';
     ui.gameOver = this.over;
     // 無限ボスモード
     ui.infinite = this.infinite;
