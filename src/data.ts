@@ -25,6 +25,7 @@ export type SkillKind =
   | 'gungnir'    // 神槍投擲(最大HP比例の多段)
   | 'summon'     // 召喚獣(エルクィネス/ダークスピリット)
   | 'shadow'     // シャドーパートナー(分身が攻撃を反復)
+  | 'kunai'      // 巨大クナイ(闇の大爆発・複数体攻撃)
   | 'heal';      // 回復
 
 export interface SkillDef {
@@ -40,6 +41,7 @@ export interface SkillDef {
   targets?: number;
   speed?: number;
   pierce?: boolean;
+  proj?: number;    // 投擲数(手裏剣の表示本数)
   healPct?: number;
   durMs?: number;
   atkBuff?: number;  // 攻撃力倍率(>1)
@@ -195,7 +197,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 1, jobName: '盗賊', rankName: '1次', spriteKey: 'thief', atkBonus: 1,
         skills: [
-          { id: 't1a', name: 'ラッキーセブン', mp: 2, cd: 700, kind: 'projectile', mult: 1.5, hits: 2, speed: 300, pierce: false },
+          { id: 't1a', name: 'ラッキーセブン', mp: 2, cd: 700, kind: 'projectile', mult: 1.5, hits: 2, proj: 2, speed: 300, pierce: false },
           { id: 't1b', name: 'ダブルスタブ', mp: 2, cd: 1200, kind: 'melee', mult: 1.5, hits: 2, range: 38 },
           { id: 't1c', name: 'ニンブルボディ', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.55 },
         ],
@@ -203,7 +205,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 10, jobName: 'アサシン', rankName: '2次', spriteKey: 'thief2', atkBonus: 1.25,
         skills: [
-          { id: 't2a', name: 'クイックスロー', mp: 2, cd: 750, kind: 'projectile', mult: 1.5, hits: 3, speed: 320, pierce: false },
+          { id: 't2a', name: 'トリプルスロー', mp: 2, cd: 750, kind: 'projectile', mult: 1.6, hits: 3, proj: 3, speed: 320, pierce: false },
           { id: 't2b', name: 'シャドーウェブ', mp: 3, cd: 1600, kind: 'freeze', mult: 1.4, hits: 2, radius: 80, durMs: 900 },
           { id: 't2c', name: 'シャドーパートナー', mp: 5, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 1, durMs: 30000 },
         ],
@@ -211,15 +213,15 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 30, jobName: 'ハーミット', rankName: '3次', spriteKey: 'thief3', atkBonus: 1.55,
         skills: [
-          { id: 't3a', name: 'アバンジャー', mp: 3, cd: 900, kind: 'projectile', mult: 1.7, hits: 4, speed: 300, pierce: true },
-          { id: 't3b', name: 'シャドーメソ', mp: 3, cd: 1700, kind: 'aoe', mult: 1.6, hits: 4, radius: 92 },
+          { id: 't3a', name: 'トリプルスロー', mp: 2, cd: 750, kind: 'projectile', mult: 1.6, hits: 3, proj: 3, speed: 320, pierce: false },
+          { id: 't3b', name: '巨大クナイ', mp: 4, cd: 1800, kind: 'kunai', mult: 1.4, hits: 4, targets: 8, radius: 115, speed: 280 },
           { id: 't3c', name: 'シャドーパートナー', mp: 5, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 2, durMs: 30000 },
         ],
       },
       {
         minLevel: 60, jobName: 'ナイトロード', rankName: '4次', spriteKey: 'thief4', atkBonus: 2.0,
         skills: [
-          { id: 't4a', name: 'トリプルスロー', mp: 3, cd: 850, kind: 'projectile', mult: 1.6, hits: 6, speed: 340, pierce: false },
+          { id: 't4a', name: 'クアドラプルスロー', mp: 3, cd: 850, kind: 'projectile', mult: 1.6, hits: 6, proj: 4, speed: 340, pierce: false },
           { id: 't4b', name: 'ショーダウン', mp: 4, cd: 1800, kind: 'aoe', mult: 1.8, hits: 6, radius: 104 },
           { id: 't4c', name: 'シャドーパートナー', mp: 6, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 3, durMs: 30000 },
         ],
@@ -227,7 +229,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 100, jobName: 'ナイトロード・極', rankName: '5次', spriteKey: 'thief5', atkBonus: 2.6,
         skills: [
-          { id: 't5a', name: 'クアドラプルスロー', mp: 3, cd: 800, kind: 'projectile', mult: 1.7, hits: 8, speed: 360, pierce: false },
+          { id: 't5a', name: 'クアドラプルスロー', mp: 3, cd: 800, kind: 'projectile', mult: 1.8, hits: 8, proj: 4, speed: 360, pierce: false },
           { id: 't5b', name: 'スプレッドスロー', mp: 5, cd: 2200, kind: 'nova', mult: 1.8, hits: 7 },
           { id: 't5c', name: 'シャドーパートナー', mp: 7, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 4, durMs: 30000 },
         ],

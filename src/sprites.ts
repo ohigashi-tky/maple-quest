@@ -2164,10 +2164,29 @@ const SHURIKEN5: SpriteDef = {
   ]],
 };
 
+// --- 巨大クナイ(闇のオーラを纏う。右向き) ---
+const KUNAI: SpriteDef = {
+  palette: { k: '#3a3a52', K: '#22222e', o: '#22222e', w: '#cfd6e8', p: '#7a3acc', g: '#c84aff', d: '#2a0a44' },
+  frames: [[
+    '...g................g...',
+    '..ooo......d......g.....',
+    '.o...o.kkkkk............',
+    '.o...okkkkkkkkk....d....',
+    '..ooo.kkwwwkkkkkkkkk....',
+    '......kkkkkkkkkkkkkkkkk.',
+    '..ooo.kkwwwkkkkkkkkk....',
+    '.o...okkkkkkkkk....d....',
+    '.o...o.kkkkk............',
+    '..ooo......d......g.....',
+    '...g................g...',
+  ]],
+};
+
 const SPRITES: Record<string, SpriteDef> = {
   warrior: WARRIOR,
   mage: MAGE,
   thief: THIEF,
+  fx_kunai: KUNAI,
   weap_w1: WEAP_W1, weap_w2: WEAP_W2, weap_w3: WEAP_W3, weap_w4: WEAP_W4, weap_w5: WEAP_W5,
   weap_m1: WEAP_M1, weap_m2: WEAP_M2, weap_m3: WEAP_M3, weap_m4: WEAP_M4, weap_m5: WEAP_M5,
   weap_t1: WEAP_T1, weap_t2: WEAP_T2, weap_t3: WEAP_T3, weap_t4: WEAP_T4, weap_t5: WEAP_T5,

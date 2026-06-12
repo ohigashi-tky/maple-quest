@@ -51,6 +51,7 @@ export interface UiState {
 
 interface BossSprite extends Phaser.Physics.Arcade.Sprite {
   floor: FloorDef;
+  expMul?: number;  // 撃破EXP倍率(双子ボスの2体目は低め)
   atk: number;
   hp: number;
   maxhp: number;
@@ -107,7 +108,21 @@ export default class GameScene extends Phaser.Scene {
   // シャドーパートナー(盗賊): 分身が本体の攻撃を反復する
   private shadowUntil = 0;
   private shadowSprites: Phaser.GameObjects.Sprite[] = [];
-  private boss: BossSprite | null = null;
+  private bosses: BossSprite[] = [];
+  // 互換用: 既存スキルは「最も近い生存ボス」を単体ターゲットとして扱う
+  private get boss(): BossSprite | null {
+    let best: BossSprite | null = null, bd = Infinity;
+    for (const b of this.bosses) {
+      if (!b.active || b.dying) continue;
+      const d = Math.abs(b.x - this.player.x);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  }
+  // 生存中のボス一覧(範囲攻撃用)
+  private aliveBosses(): BossSprite[] {
+    return this.bosses.filter((b) => b.active && !b.dying);
+  }
   private portal: Phaser.Physics.Arcade.Sprite | null = null;
   private over = false;
   private transitioning = false;
@@ -130,7 +145,7 @@ export default class GameScene extends Phaser.Scene {
     this.summons = {};
     this.shadowUntil = 0;
     this.shadowSprites = [];
-    this.boss = null;
+    this.bosses = [];
     this.portal = null;
     this.over = false;
     this.transitioning = false;
@@ -498,20 +513,32 @@ export default class GameScene extends Phaser.Scene {
     if (this.over) return;
     if (this.infinite) { this.spawnTitan(); return; }
     const f = this.floor;
+    // 偶数層はボス2体(2体目はやや小さく・弱め)
+    const twin = f.floor % 2 === 0;
+    this.spawnOne(f, ARENA_W * 0.7, 1, 0);
+    if (twin) this.spawnOne(f, ARENA_W * 0.42, 0.78, 350);
+
+    this.cameras.main.shake(300, f.major ? 0.0035 : 0.0022);
+    sfx('thunder');
+    if (f.major) this.cameras.main.flash(300, 255, 120, 120);
+  }
+
+  // ボス1体を異次元の裂け目から出現させる
+  private spawnOne(f: FloorDef, x: number, mul: number, delayMs: number) {
     const flying = f.archetype === 'demon' || f.archetype === 'beast';
-    const x = ARENA_W * 0.7;
     const y = flying ? GROUND_Y - 110 : GROUND_Y - 40;
     const b = this.physics.add.sprite(x, y, `boss_${f.archetype}_0`) as BossSprite;
     b.floor = f;
     b.flying = flying;
-    b.atk = bossAtk(f, this.progress.difficulty);
-    b.maxhp = bossHp(f, this.progress.difficulty);
+    b.atk = bossAtk(f, this.progress.difficulty) * (mul < 1 ? 0.85 : 1);
+    b.maxhp = Math.floor(bossHp(f, this.progress.difficulty) * (mul < 1 ? 0.6 : 1));
     b.hp = b.maxhp;
+    b.expMul = mul < 1 ? 0.5 : 1;
     b.lastHitAt = 0;
     b.aiTimer = 0;
     b.touchCd = 0;
     b.dir = -1;
-    b.setScale(f.scale);
+    b.setScale(f.scale * mul);
     b.setTint(f.tint);
     b.play(`boss_${f.archetype}_move`);
     b.setDepth(8);
@@ -522,20 +549,62 @@ export default class GameScene extends Phaser.Scene {
     if (!flying) b.y = GROUND_Y - b.displayHeight / 2 - 6;
     if (flying) (b.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
     else this.physics.add.collider(b, this.platforms);
-    this.boss = b;
+    this.bosses.push(b);
     this.bossActive = true;
 
-    this.cameras.main.shake(300, f.major ? 0.0035 : 0.0022);
-    sfx('thunder');
-    if (f.major) this.cameras.main.flash(300, 255, 120, 120);
+    this.riftAppear(b, delayMs, () => {
+      const pattern = () => {
+        if (!b.active || this.over) return;
+        this.bossAction(b);
+        const enraged = b.hp < b.maxhp * 0.5;
+        // 攻撃間隔はやや余裕を持たせる(機敏すぎ防止)
+        this.time.delayedCall(enraged ? 1900 : 2800, pattern);
+      };
+      this.time.delayedCall(1300, pattern);
+    });
+  }
 
-    const pattern = () => {
+  // 異次元の裂け目からボスが現れる演出
+  private riftAppear(b: BossSprite, delayMs: number, onDone: () => void) {
+    const fsx = b.scaleX, fsy = b.scaleY;
+    const fullH = b.displayHeight;  // 縮小前に計算
+    b.setAlpha(0);
+    b.setScale(fsx * 0.2, fsy * 0.2);
+    (b.body as Phaser.Physics.Arcade.Body).enable = false;
+    this.time.delayedCall(delayMs, () => {
       if (!b.active || this.over) return;
-      this.bossAction(b);
-      const enraged = b.hp < b.maxhp * 0.5;
-      this.time.delayedCall(enraged ? 1500 : 2300, pattern);
-    };
-    this.time.delayedCall(1400, pattern);
+      const bx = b.x, by = b.y;
+      // 縦に裂ける次元の亀裂
+      const rift = this.add.ellipse(bx, by, 4, 12, 0x0c0418, 0.95).setDepth(9).setStrokeStyle(2, 0xb86aff, 0.9);
+      const glow = this.add.ellipse(bx, by, 8, 20, 0x7a3acc, 0.4).setDepth(8).setBlendMode(Phaser.BlendModes.ADD);
+      sfx('portal');
+      this.tweens.add({
+        targets: rift, width: 34, height: fullH * 1.15, duration: 420, ease: 'Cubic.easeOut',
+        onUpdate: () => rift.setSize(rift.width, rift.height),
+      });
+      this.tweens.add({
+        targets: glow, width: 60, height: fullH * 1.4, duration: 420, ease: 'Cubic.easeOut',
+        onUpdate: () => glow.setSize(glow.width, glow.height),
+      });
+      // 裂け目から紫の粒子が漏れる
+      for (let i = 0; i < 8; i++) {
+        const sp = this.add.rectangle(bx, by + Phaser.Math.Between(-20, 20), 2, 2, i % 2 ? 0xc84aff : 0x7a3acc, 1).setDepth(10);
+        this.tweens.add({ targets: sp, x: bx + Phaser.Math.Between(-40, 40), y: sp.y + Phaser.Math.Between(-26, 26), alpha: 0, duration: 520, delay: i * 50, onComplete: () => sp.destroy() });
+      }
+      // ボス本体が裂け目から実体化
+      this.time.delayedCall(380, () => {
+        if (!b.active || this.over) { rift.destroy(); glow.destroy(); return; }
+        this.tweens.add({ targets: b, alpha: 1, scaleX: fsx, scaleY: fsy, duration: 380, ease: 'Back.easeOut' });
+        this.cameras.main.shake(120, 0.0015);
+        sfx('thunder');
+        this.time.delayedCall(380, () => {
+          if (b.active) (b.body as Phaser.Physics.Arcade.Body).enable = true;
+          // 裂け目が閉じる
+          this.tweens.add({ targets: [rift, glow], scaleX: 0, alpha: 0, duration: 280, onComplete: () => { rift.destroy(); glow.destroy(); } });
+          onDone();
+        });
+      });
+    });
   }
 
   // 無限ボス: 巨大タイタンを設置(ゲージHP・攻撃は1ダメージ・ほぼ静止)
@@ -560,7 +629,7 @@ export default class GameScene extends Phaser.Scene {
     b.setSize(bw, bh).setOffset((b.width - bw) / 2, b.height - bh);
     this.physics.add.collider(b, this.platforms);
     (b as BossSprite & { titan?: boolean }).stunUntil = 0;
-    this.boss = b;
+    this.bosses = [b];
     this.bossActive = true;
 
     this.cameras.main.shake(260, 0.003);
@@ -732,7 +801,7 @@ export default class GameScene extends Phaser.Scene {
     const body = b.body as Phaser.Physics.Arcade.Body;
     // 予兆(目を光らせる)
     b.setTintFill(0xffffff);
-    this.time.delayedCall(180, () => { if (b.active) b.setTint(b.floor.tint); body.setVelocity(toPlayer * 300, b.flying ? 0 : -70); });
+    this.time.delayedCall(180, () => { if (b.active) b.setTint(b.floor.tint); body.setVelocity(toPlayer * 265, b.flying ? 0 : -70); });
     this.time.delayedCall(640, () => b.active && body.setVelocityX(toPlayer * 60));
   }
 
@@ -873,6 +942,7 @@ export default class GameScene extends Phaser.Scene {
     } else if (this.progress.charKey === 'thief') {
       sfx('claw');
       this.shoot(this.shurikenTex, 300, 1.0, false, 90, 1, 1, true);
+      this.shadowThrows();
     } else {
       sfx('claw');
       this.clawFx();
@@ -917,6 +987,7 @@ export default class GameScene extends Phaser.Scene {
       case 'gungnir': this.skGungnir(skill); break;
       case 'summon': this.skSummon(skill); break;
       case 'shadow': this.skShadow(skill); break;
+      case 'kunai': this.skKunai(skill); break;
       case 'heal': this.skHeal(skill); break;
     }
   }
@@ -1106,6 +1177,55 @@ export default class GameScene extends Phaser.Scene {
   // 分身の攻撃力倍率: 50%から1体増えるごとに-10%(2体40%/3体30%/4体20%)
   private shadowMul(): number {
     return Math.max(0.1, 0.5 - (this.shadowSprites.length - 1) * 0.1);
+  }
+
+  // 分身も同じ手裏剣を投げる(見た目用。ダメージは分身エコーで計上済み)
+  private shadowThrows(yOff = 0) {
+    if (!this.shadowSprites.length || this.time.now >= this.shadowUntil) return;
+    this.shadowSprites.forEach((sp, i) => {
+      this.time.delayedCall(90 + i * 60, () => {
+        if (this.over || !sp.active) return;
+        const img = this.add.image(sp.x + this.facing * 8, sp.y - 4 + yOff, this.shurikenTex)
+          .setDepth(10).setScale(0.85).setAlpha(0.5).setTint(0xb09ae0);
+        this.tweens.add({ targets: img, x: img.x + this.facing * 210, angle: this.facing * 720, alpha: 0, duration: 620, onComplete: () => img.destroy() });
+      });
+    });
+  }
+
+  // 巨大クナイ: 巨大なクナイを投げ、闇の大爆発で複数体を同時攻撃
+  private skKunai(s: SkillDef) {
+    sfx('slashpro');
+    const dir = this.facing;
+    const target = this.boss;
+    const tx = target && target.active ? target.x : this.player.x + dir * 170;
+    const ty = target && target.active ? target.y : this.player.y - 6;
+    const kunai = this.add.image(this.player.x + dir * 14, this.player.y - 6, 'fx_kunai_0')
+      .setDepth(13).setScale(2.0).setFlipX(dir < 0);
+    this.tweens.add({ targets: kunai, scale: 2.4, duration: 120, yoyo: true });
+    this.tweens.add({
+      targets: kunai, x: tx, y: ty, duration: 230, ease: 'Quad.easeIn',
+      onComplete: () => {
+        kunai.destroy();
+        if (this.over) return;
+        // 非常に大きな闇の爆発
+        sfx('thunder');
+        this.cameras.main.shake(150, 0.0028);
+        const radius = s.radius ?? 115;
+        const core = this.add.circle(tx, ty, 14, 0x12041e, 0.95).setDepth(12);
+        const ring1 = this.add.circle(tx, ty, 16, 0x7a3acc, 0.7).setDepth(12);
+        const ring2 = this.add.circle(tx, ty, 10, 0xc84aff, 0.6).setDepth(12).setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({ targets: core, radius: radius * 0.92, alpha: 0, duration: 440, onUpdate: () => core.setRadius(core.radius), onComplete: () => core.destroy() });
+        this.tweens.add({ targets: ring1, radius: radius, alpha: 0, duration: 500, onUpdate: () => ring1.setRadius(ring1.radius), onComplete: () => ring1.destroy() });
+        this.tweens.add({ targets: ring2, radius: radius * 0.72, alpha: 0, duration: 400, onUpdate: () => ring2.setRadius(ring2.radius), onComplete: () => ring2.destroy() });
+        for (let q = 0; q < 12; q++) {
+          const a = Math.random() * Math.PI * 2, r = radius * (0.3 + Math.random() * 0.65);
+          const sp = this.add.rectangle(tx, ty, 3, 3, q % 2 ? 0xc84aff : 0x2a0a44, 1).setDepth(13);
+          this.tweens.add({ targets: sp, x: tx + Math.cos(a) * r, y: ty + Math.sin(a) * r, alpha: 0, duration: 440, onComplete: () => sp.destroy() });
+        }
+        this.aoeDamage(tx, ty, radius, s.mult, s.hits);
+      },
+    });
+    this.shadowThrows();
   }
 
   // 召喚: エルクィネス(氷の鳥) / ダークスピリット(黒い魂)
@@ -1323,14 +1443,16 @@ export default class GameScene extends Phaser.Scene {
 
   private skProjectile(s: SkillDef, primary = false) {
     if (this.progress.charKey === 'thief') {
-      // 手裏剣投擲: 多段ぶんを時間差で連投(回転付き)
+      // 手裏剣投擲: スキル名どおりの本数(proj)を縦に並べて連投(回転付き)
       sfx(primary ? 'slashpro' : 'claw');
-      const throws = Math.min(4, Math.max(1, Math.ceil(s.hits / 2)));
-      const hitsPer = Math.ceil(s.hits / throws);
+      const throws = s.proj ?? Math.min(4, Math.max(1, Math.ceil(s.hits / 2)));
+      const hitsPer = Math.max(1, Math.round(s.hits / throws));
       for (let k = 0; k < throws; k++) {
-        this.time.delayedCall(k * 80, () => {
+        this.time.delayedCall(k * 70, () => {
           if (this.over) return;
-          this.shoot(this.shurikenTex, s.speed ?? 300, s.mult, s.pierce ?? false, 280, 0.9 + s.hits * 0.08, hitsPer, true);
+          const yOff = (k - (throws - 1) / 2) * 8;
+          this.shoot(this.shurikenTex, s.speed ?? 300, s.mult, s.pierce ?? false, 280, 0.95, hitsPer, true, yOff);
+          this.shadowThrows(yOff);  // 影も同じ本数を投げる
         });
       }
       return;
@@ -1480,9 +1602,10 @@ export default class GameScene extends Phaser.Scene {
 
   // ---- 共通ヘルパー ----
   private aoeDamage(x: number, y: number, radius: number, mult: number, hits: number, flat = false) {
-    const b = this.boss;
-    if (b && b.active && !b.dying && Phaser.Math.Distance.Between(x, y, b.x, b.y) < radius + b.displayWidth / 3) {
-      this.hitEnemy(b, mult, hits, flat);
+    for (const b of this.aliveBosses()) {
+      if (Phaser.Math.Distance.Between(x, y, b.x, b.y) < radius + b.displayWidth / 3) {
+        this.hitEnemy(b, mult, hits, flat);
+      }
     }
   }
 
@@ -1565,18 +1688,18 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private meleeHit(range: number, mult: number, hits: number) {
-    const b = this.boss;
-    if (!b || !b.active || b.dying) return;
-    const dx = b.x - this.player.x;
-    const inFront = Math.sign(dx) === this.facing || Math.abs(dx) < 14;
-    if (inFront && Math.abs(dx) < range + b.displayWidth / 2.5 && Math.abs(b.y - this.player.y) < 40 + b.displayHeight / 3) {
-      this.hitEnemy(b, mult, hits);
+    for (const b of this.aliveBosses()) {
+      const dx = b.x - this.player.x;
+      const inFront = Math.sign(dx) === this.facing || Math.abs(dx) < 14;
+      if (inFront && Math.abs(dx) < range + b.displayWidth / 2.5 && Math.abs(b.y - this.player.y) < 40 + b.displayHeight / 3) {
+        this.hitEnemy(b, mult, hits);
+      }
     }
   }
 
-  private shoot(tex: string, speed: number, mult: number, pierce: boolean, rangeMs: number, scale: number, hits: number, spin = false) {
+  private shoot(tex: string, speed: number, mult: number, pierce: boolean, rangeMs: number, scale: number, hits: number, spin = false, yOff = 0) {
     const shot = this.playerShots.create(
-      this.player.x + this.facing * 10, this.player.y - 4, tex
+      this.player.x + this.facing * 10, this.player.y - 4 + yOff, tex
     ) as Phaser.Physics.Arcade.Sprite & { mult: number; pierce: boolean; hits: number; hitSet: Set<BossSprite> };
     shot.setVelocityX(this.facing * speed);
     shot.setFlipX(this.facing < 0);
@@ -1673,20 +1796,41 @@ export default class GameScene extends Phaser.Scene {
     const x = e.x + (flat ? Phaser.Math.Between(-7, 7) : (stack % 2 === 0 ? -1 : 1) * Math.min(8, stack * 2));
     const baseY = e.y - e.displayHeight / 2 - 8;
     const y = baseY - stack * 12;
-    // クリティカルは赤く大きく太い(メイプル風・びっくりマークなし)
-    const t = this.add.text(x, y, fmt(dmg), {
-      fontFamily: '"Arial Black", sans-serif',
-      fontSize: crit ? '15px' : '14px',
-      fontStyle: 'bold',
-      color: crit ? '#ff2a2a' : '#ffffff',
-      stroke: crit ? '#5a0606' : '#a8500a',
-      strokeThickness: crit ? 5 : 4,
-    }).setOrigin(0.5).setDepth(21).setResolution(4);
-    t.setScale(0.4);
-    this.tweens.add({ targets: t, scale: crit ? 1.12 : 1, duration: 130, ease: 'Back.easeOut' });
+    // 黒枠の中に白枠、その中にグラデーション文字(クリ=赤/通常=オレンジ、下にいくほど薄く)
+    const str = fmt(dmg);
+    const c = this.add.container(x, y).setDepth(21);
+    const fontSize = crit ? '15px' : '14px';
+    const back = this.add.text(0, 0, str, {
+      fontFamily: '"Arial Black", sans-serif', fontSize, fontStyle: 'bold',
+      color: '#000000', stroke: '#000000', strokeThickness: 8,
+    }).setOrigin(0.5).setResolution(4);
+    const front = this.add.text(0, 0, str, {
+      fontFamily: '"Arial Black", sans-serif', fontSize, fontStyle: 'bold',
+      color: crit ? '#ff2a2a' : '#ff8a00', stroke: '#ffffff', strokeThickness: 4,
+    }).setOrigin(0.5).setResolution(4);
+    const grad = front.context.createLinearGradient(0, 0, 0, front.canvas.height);
+    if (crit) {
+      grad.addColorStop(0, '#ff1414');
+      grad.addColorStop(0.55, '#ff5050');
+      grad.addColorStop(1, '#ffc0b4');
+    } else {
+      grad.addColorStop(0, '#ff8a00');
+      grad.addColorStop(0.55, '#ffaa3a');
+      grad.addColorStop(1, '#ffe4b4');
+    }
+    front.setFill(grad);
+    c.add([back, front]);
+    // クリティカル: 数字の左に薄黄色の爆発エフェクト
+    if (crit) {
+      const burst = this.add.image(-front.width / 2 - 5, 0, 'fx_star_0').setTint(0xfff2b0).setAlpha(0.95).setScale(0.7);
+      c.add(burst);
+      this.tweens.add({ targets: burst, scale: 1.7, alpha: 0, angle: 50, duration: 330, ease: 'Cubic.easeOut' });
+    }
+    c.setScale(0.4);
+    this.tweens.add({ targets: c, scale: crit ? 1.1 : 1, duration: 130, ease: 'Back.easeOut' });
     // flatは短めに消えて次々重なる
     const fade = flat ? 520 : 900;
-    this.tweens.add({ targets: t, y: y - 14, alpha: 0, duration: fade, delay: flat ? 60 : 200, ease: 'Quad.easeOut', onComplete: () => t.destroy() });
+    this.tweens.add({ targets: c, y: y - 14, alpha: 0, duration: fade, delay: flat ? 60 : 200, ease: 'Quad.easeOut', onComplete: () => c.destroy() });
   }
 
   private missNumber(e: BossSprite) {
@@ -1701,17 +1845,21 @@ export default class GameScene extends Phaser.Scene {
     e.dying = true;
     e.hpBar?.destroy();
     (e.body as Phaser.Physics.Arcade.Body).enable = false;
-    this.bossActive = false;
     sfx('bossdie');
-    this.gainExp(bossExp(e.floor, this.progress.difficulty));
-    this.boss = null;
+    this.gainExp(Math.floor(bossExp(e.floor, this.progress.difficulty) * (e.expMul ?? 1)));
+    const remain = this.bosses.some((x) => x !== e && x.active && !x.dying);
+    this.bossActive = remain;
     this.cameras.main.shake(320, 0.004);
     this.cameras.main.flash(400, 255, 255, 255);
     this.tweens.add({
       targets: e, alpha: 0, y: e.y - 14, scaleX: e.scaleX * 1.1, scaleY: e.scaleY * 1.1, duration: 900,
       onComplete: () => e.destroy(),
     });
-    // 撃破でエリクサー補充
+    // 残りのボスがいる間はポータルを開かない(偶数層は2体)
+    if (remain) {
+      this.hud()?.showBanner(`${e.floor.bossName} 1体撃破! 残り1体!`, '#ffe45a');
+      return;
+    }
     // ステージクリアでエリクサーを5個支給
     this.progress.elixirs = Math.min(this.progress.elixirs + 5, ELIXIR_MAX);
     this.floatText(this.player.x, this.player.y - 44, 'エリクサー +5', '#ffd24a');
@@ -2038,7 +2186,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   private updateBoss() {
-    const b = this.boss;
+    for (const b of this.bosses) this.updateBossOne(b);
+  }
+
+  private updateBossOne(b: BossSprite) {
     if (!b || !b.active || b.dying) return;
     const now = this.time.now;
     const body = b.body as Phaser.Physics.Arcade.Body;
@@ -2078,7 +2229,7 @@ export default class GameScene extends Phaser.Scene {
     // ダッシュ攻撃などで速度が高い間はAIの移動を上書きしない
     const dashing = Math.abs(body.velocity.x) > 180 || Math.abs(body.velocity.y) > 200;
     const slowed = b.slowUntil && this.time.now < b.slowUntil ? 0.5 : 1; // フリージングブレスの減速
-    const spd = (b.floor.archetype === 'beast' ? 78 : 52) * (enraged ? 1.4 : 1) * slowed;
+    const spd = (b.floor.archetype === 'beast' ? 64 : 43) * (enraged ? 1.35 : 1) * slowed;  // 機敏すぎ防止に減速
     // アーキタイプごとの基準間合い(近接ボスは近め、遠隔ボスは遠め)
     const keep = ({ golem: 46, mush: 50, beast: 40, knight: 44, drake: 96, demon: 100, clown: 104, witch: 118, lord: 122 } as Record<string, number>)[b.floor.archetype] ?? 70;
     const dx = this.player.x - b.x;
@@ -2139,12 +2290,13 @@ export default class GameScene extends Phaser.Scene {
     for (const shot of this.playerShots.getChildren() as (Phaser.Physics.Arcade.Sprite & { mult: number; pierce: boolean; hits: number; hitSet: Set<BossSprite> })[]) {
       if (!shot.active) continue;
       if (shot.x < -20 || shot.x > ARENA_W + 20) { shot.destroy(); continue; }
-      const b = this.boss;
-      if (b && b.active && !b.dying && !shot.hitSet.has(b) &&
-        Math.abs(b.x - shot.x) < b.displayWidth / 2 + 8 && Math.abs(b.y - shot.y) < b.displayHeight / 2 + 8) {
-        shot.hitSet.add(b);
-        this.hitEnemy(b, shot.mult, shot.hits);
-        if (!shot.pierce) shot.destroy();
+      for (const b of this.aliveBosses()) {
+        if (shot.hitSet.has(b)) continue;
+        if (Math.abs(b.x - shot.x) < b.displayWidth / 2 + 8 && Math.abs(b.y - shot.y) < b.displayHeight / 2 + 8) {
+          shot.hitSet.add(b);
+          this.hitEnemy(b, shot.mult, shot.hits);
+          if (!shot.pierce) { shot.destroy(); break; }
+        }
       }
     }
     for (const shot of this.enemyShots.getChildren() as (Phaser.Physics.Arcade.Sprite & { homing?: boolean })[]) {
