@@ -903,6 +903,110 @@ const STAR: SpriteDef = {
   ],
 };
 
+// エルクィネス: 氷の伝説の鳥(青く美しい不死鳥)
+const ELQUINES: SpriteDef = {
+  palette: { b: '#5ab0ff', B: '#2f7fd6', w: '#dff2ff', c: '#9ad8ff', k: '#1a2a44', y: '#bfeaff' },
+  frames: [
+    [
+      '.......ww.......',
+      '......wbbw......',
+      '.....wbBBbw....c',
+      '....wbBkBbw..cc.',
+      '..c.wbBBBbw.cc..',
+      '.cc.wbbbbbwcc...',
+      'ccwbbbbbbbbbwc..',
+      '.cbbbccccbbbbc..',
+      '..wbbccwwccbbw..',
+      '...wbbbwwbbbw...',
+      '....wbbwwbbw....',
+      '.....wbwwbw.....',
+      '...y..wwww..y...',
+      '..yy..wbbw..yy..',
+      '.yy...wbbw...yy.',
+      '......yyyy......',
+    ],
+    [
+      '.......ww.......',
+      '......wbbw......',
+      'c....wbBBbw....c',
+      '.cc.wbBkBbw..cc.',
+      '..cwbBBBbw..cc..',
+      '..cwbbbbbbwcc...',
+      '.cwbbbbbbbbbwc..',
+      '.cbbbbccbbbbbc..',
+      '..wbbccwwccbbw..',
+      '...wbbwwwwbbw...',
+      '...wbbwwwwbbw...',
+      '....wbwwwwbw....',
+      '..y..wwwwww..y..',
+      '.yy..wbbbbw..yy.',
+      '.y...wbbbbw...y.',
+      '.....yyyyyy.....',
+    ],
+  ],
+};
+
+// ダークスピリット: 目のある黒い魂
+const DARKSPIRIT: SpriteDef = {
+  palette: { d: '#2a1a3a', D: '#160c22', p: '#7a3acc', w: '#e0c8ff', k: '#0a0612', r: '#c84aff' },
+  frames: [
+    [
+      '....dddddd....',
+      '..ddDDDDDDdd..',
+      '.dDDDDDDDDDDd.',
+      '.dDDwwwwwwDDd.',
+      'dDDwwwkkwwwDDd',
+      'dDDwwwkkwwwDDd',
+      'dDDwwwwwwwwDDd',
+      'dDDDDDDDDDDDDd',
+      '.dDDDDDDDDDDd.',
+      '.pdDDDDDDDDdp.',
+      '..pdDDDDDDdp..',
+      '...pdDddDdp...',
+      '..p..d..d..p..',
+      '.p..d....d..p.',
+    ],
+    [
+      '....dddddd....',
+      '..ddDDDDDDdd..',
+      '.dDDDDDDDDDDd.',
+      '.dDDwwwwwwDDd.',
+      'dDDwwkkkkwwDDd',
+      'dDDwwkkkkwwDDd',
+      'dDDwwwwwwwwDDd',
+      'dDDDDDDDDDDDDd',
+      '.dDDDDDDDDDDd.',
+      'pdDDDDDDDDDDdp',
+      '.pdDDDDDDDDdp.',
+      '..pddDddDddp..',
+      '...p.d..d.p...',
+      '..p...dd...p..',
+    ],
+  ],
+};
+
+// 氷ドラゴンの顔(フリージングブレスの口元)
+const ICEDRAGON: SpriteDef = {
+  palette: { b: '#4aa0e8', B: '#2f6fb8', w: '#dff2ff', c: '#9ad8ff', k: '#16304a', y: '#bfeaff' },
+  frames: [
+    [
+      '..y..........y..',
+      '.yBy........yBy.',
+      '.yBBy......yBBy.',
+      '..bBBbwwwwbBBb..',
+      '.bBBkBwwwwBkBBb.',
+      'bBBBBBwwwwBBBBBb',
+      'bBBBBBBBBBBBBBBb',
+      'cBBBBwwwwwwBBBBc',
+      '.cBBwwccccwwBBc.',
+      '..cBwwc..cwwBc..',
+      '...cwwc..cwwc...',
+      '....ccc..ccc....',
+      '.....c....c.....',
+    ],
+  ],
+};
+
 const PORTAL: SpriteDef = {
   palette: { b: '#4a7fd6', B: '#2f5aa8', w: '#bfe0ff', c: '#7ab8ff' },
   frames: [
@@ -1695,6 +1799,9 @@ const SPRITES: Record<string, SpriteDef> = {
   fx_orb: ORB,
   fx_feather: FEATHER,
   fx_star: STAR,
+  fx_elquines: ELQUINES,
+  fx_darkspirit: DARKSPIRIT,
+  fx_icedragon: ICEDRAGON,
   portal: PORTAL,
   elixir: ELIXIR,
   fx_ice: ICE,
@@ -1957,6 +2064,8 @@ export function createAllAnims(scene: Phaser.Scene) {
   mk('pinkbean_move', 'pinkbean', [0, 1], 3);
   mk('cygnus_move', 'cygnus', [0, 1], 4);
   mk('portal_spin', 'portal', [0, 1], 5);
+  mk('fx_elquines_fly', 'fx_elquines', [0, 1], 8);
+  mk('fx_darkspirit_idle', 'fx_darkspirit', [0, 1], 4);
   mk('fx_slash_play', 'fx_slash', [0, 1], 14, 0);
   mk('fx_claw_play', 'fx_claw', [0, 1], 14, 0);
   mk('fx_heal_play', 'fx_heal', [0, 1, 0, 1], 8, 0);

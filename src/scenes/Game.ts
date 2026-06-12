@@ -68,6 +68,7 @@ interface BossSprite extends Phaser.Physics.Arcade.Sprite {
   stunUntil?: number;
   dmgStackAt?: number;  // 直近のダメージ表示時刻(多段の積み重ね用)
   dmgStackN?: number;   // 連続ヒット数
+  slowUntil?: number;   // フリージングブレスの減速デバフ
   roamAt?: number;      // 次に気まぐれ移動を更新する時刻
   targetDist?: number;  // 現在保とうとしている間合い
   strafe?: number;      // 横方向の気まぐれ(-1/0/1)
@@ -99,6 +100,11 @@ export default class GameScene extends Phaser.Scene {
     warrior: { atk: 1, def: 1, hp: 1, cd: 1, until: 0, name: '' },
     mage: { atk: 1, def: 1, hp: 1, cd: 1, until: 0, name: '' },
   };
+  // 召喚獣が付与する一時バフ(攻撃/防御/クリティカル)
+  private sumBuff = { atk: 1, def: 1, crit: 0, until: 0 };
+  private inputLockUntil = 0;  // フリージングブレス等で行動不能
+  // 召喚獣(エルクィネス/ダークスピリット)。再詠唱で作り直す
+  private summons: Record<string, { sprite: Phaser.GameObjects.Sprite; endAt: number; ev: Phaser.Time.TimerEvent }> = {};
   private boss: BossSprite | null = null;
   private portal: Phaser.Physics.Arcade.Sprite | null = null;
   private over = false;
@@ -118,6 +124,9 @@ export default class GameScene extends Phaser.Scene {
     this.switchCdAt = 0;
     this.invulnUntil = 0;
     this.elixirCdUntil = 0;
+    this.inputLockUntil = 0;
+    this.sumBuff = { atk: 1, def: 1, crit: 0, until: 0 };
+    this.summons = {};
     this.boss = null;
     this.portal = null;
     this.over = false;
@@ -184,7 +193,7 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(1100, () => this.spawnBoss());
     }
 
-    this.events.on('shutdown', () => this.tweens.killAll());
+    this.events.on('shutdown', () => { this.tweens.killAll(); this.clearSummons(); });
   }
 
   hud(): HudScene | null {
@@ -425,7 +434,8 @@ export default class GameScene extends Phaser.Scene {
   private atk() {
     const buff = this.buffs[this.progress.charKey];
     const buffMul = this.time.now < buff.until ? buff.atk : 1;
-    return CHARACTERS[this.progress.charKey].atk * atkScale(this.progress.level) * this.jobTier.atkBonus * buffMul;
+    const sumMul = this.time.now < this.sumBuff.until ? this.sumBuff.atk : 1; // 召喚バフ
+    return CHARACTERS[this.progress.charKey].atk * atkScale(this.progress.level) * this.jobTier.atkBonus * buffMul * sumMul;
   }
   private skillMpCost(s: SkillDef): number {
     return Math.max(1, Math.floor(this.maxMp(this.progress.charKey) * s.mp / 100));
@@ -808,6 +818,7 @@ export default class GameScene extends Phaser.Scene {
   doAttack() {
     if (this.over || this.transitioning) return;
     const now = this.time.now;
+    if (now < this.inputLockUntil) return; // 行動不能中
     if (now < this.attackCdAt) return;
     this.attackCdAt = now + 360;
     this.playAttackAnim();
@@ -824,6 +835,7 @@ export default class GameScene extends Phaser.Scene {
 
   doSkill(i: number) {
     if (this.over || this.transitioning) return;
+    if (this.time.now < this.inputLockUntil) return; // 行動不能中
     const skill = this.jobTier.skills[i];
     if (!skill) return;
     const now = this.time.now;
@@ -853,6 +865,9 @@ export default class GameScene extends Phaser.Scene {
       case 'chain': this.skChain(skill); break;
       case 'nova': this.skNova(skill); break;
       case 'channel': this.skChannel(skill); break;
+      case 'breath': this.skBreath(skill); break;
+      case 'gungnir': this.skGungnir(skill); break;
+      case 'summon': this.skSummon(skill); break;
       case 'heal': this.skHeal(skill); break;
     }
   }
@@ -888,6 +903,155 @@ export default class GameScene extends Phaser.Scene {
       },
     });
     this.cameras.main.shake(120, 0.003);
+  }
+
+  // フリージングブレス: キーダウン中(最大5秒)行動不能+完全無敵。前方の敵を多段攻撃し減速デバフ
+  private skBreath(s: SkillDef) {
+    const dur = s.durMs ?? 5000;
+    const end = this.time.now + dur;
+    this.inputLockUntil = end;            // 行動不能
+    this.invulnUntil = end + 100;          // 完全無敵
+    (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
+    sfx('cyclone');
+    const dir = this.facing;
+    const range = s.range ?? 200;
+    // 氷ドラゴンの顔
+    const head = this.add.sprite(this.player.x + dir * 26, this.player.y - 6, 'fx_icedragon_0')
+      .setDepth(13).setScale(2.2).setFlipX(dir < 0).setAlpha(0.95);
+    let tick = 0;
+    const ev = this.time.addEvent({
+      delay: 130, loop: true,
+      callback: () => {
+        if (this.over || this.time.now >= end) { ev.remove(); this.tweens.add({ targets: head, alpha: 0, duration: 200, onComplete: () => head.destroy() }); return; }
+        head.setPosition(this.player.x + dir * 26, this.player.y - 6).setFlipX(dir < 0);
+        if (tick % 3 === 0) sfx('cyclone');
+        // 氷のブレス粒子
+        const bx = this.player.x + dir * (40 + Math.random() * range * 0.7);
+        const by = this.player.y - 6 + Phaser.Math.Between(-18, 18);
+        const ice = this.add.image(bx, by, 'fx_ice_0').setDepth(12).setScale(Phaser.Math.FloatBetween(0.7, 1.3)).setAlpha(0.9).setTint(0xbfeaff);
+        this.tweens.add({ targets: ice, x: bx + dir * 30, alpha: 0, duration: 260, onComplete: () => ice.destroy() });
+        tick++;
+        // 前方の敵に120%×4ヒット + 減速デバフ
+        const b = this.boss;
+        if (b && b.active && !b.dying) {
+          const dx = b.x - this.player.x;
+          if ((dir > 0 ? dx > -20 : dx < 20) && Math.abs(dx) < range && Math.abs(b.y - this.player.y) < 80) {
+            this.hitEnemy(b, s.mult, s.hits, true);
+            b.slowUntil = this.time.now + 3000; // 移動・攻撃速度半減(3秒)
+            b.setTint(0x9ad8ff);
+          }
+        }
+      },
+    });
+    // 自分を氷のオーラで包む(無敵表現)
+    this.player.setTint(0x9ad8ff);
+    this.time.delayedCall(dur, () => { if (!this.over) this.player.clearTint(); });
+    this.cameras.main.shake(140, 0.003);
+  }
+
+  // グングニル: 神槍を投げ、最大HPに比例した致命的多段ダメージ。攻撃ごとにHP比ダメージが増加
+  private skGungnir(s: SkillDef) {
+    sfx('slashpro');
+    this.cameras.main.shake(160, 0.004);
+    this.cameras.main.flash(160, 220, 230, 255);
+    const b = this.boss;
+    const dir = this.facing;
+    const maxhp = this.maxHp(this.progress.charKey);
+    // 投げる槍の演出
+    const spear = this.add.rectangle(this.player.x, this.player.y - 4, 30, 5, 0xdfeaff, 1).setDepth(13).setOrigin(0.5);
+    const tx = b && b.active ? b.x : this.player.x + dir * 160;
+    this.tweens.add({ targets: spear, x: tx, duration: 180, onComplete: () => spear.destroy() });
+    // 12回の多段。攻撃ごとに最大HPの110%ぶんダメージ加算
+    for (let k = 0; k < s.hits; k++) {
+      this.time.delayedCall(180 + k * 70, () => {
+        if (!b || !b.active || b.dying) return;
+        const bonus = Math.floor(maxhp * 1.1 * (k + 1)); // 攻撃ごとに増加
+        this.boltFx(b.x + Phaser.Math.Between(-12, 12), b.y, 1.2);
+        this.hitEnemy(b, s.mult, 1, false, bonus);
+      });
+    }
+  }
+
+  // 召喚: エルクィネス(氷の鳥) / ダークスピリット(黒い魂)
+  private skSummon(s: SkillDef) {
+    sfx('portal');
+    const isBird = s.name.includes('エルクィネス');
+    const key = isBird ? 'elquines' : 'darkspirit';
+    // 既存の同種召喚は作り直す
+    const prev = this.summons[key];
+    if (prev) { prev.ev.remove(); prev.sprite.destroy(); }
+    const tex = isBird ? 'fx_elquines_0' : 'fx_darkspirit_0';
+    const anim = isBird ? 'fx_elquines_fly' : 'fx_darkspirit_idle';
+    const spr = this.add.sprite(this.player.x, this.player.y - 40, tex).setDepth(14).setScale(isBird ? 1.6 : 1.5);
+    spr.play(anim);
+    const endAt = this.time.now + (s.durMs ?? 20000);
+    // 召喚演出
+    const ring = this.add.circle(this.player.x, this.player.y - 40, 8, isBird ? 0x9ad8ff : 0x9a5ad8, 0.6).setDepth(13);
+    this.tweens.add({ targets: ring, radius: 34, alpha: 0, duration: 450, onUpdate: () => ring.setRadius(ring.radius), onComplete: () => ring.destroy() });
+    this.floatText(this.player.x, this.player.y - 56, isBird ? 'エルクィネス召喚!' : 'ダークスピリット召喚!', isBird ? '#9ad8ff' : '#c8a4ff');
+
+    const ev = this.time.addEvent({
+      delay: isBird ? 2000 : 2400, loop: true,
+      callback: () => {
+        if (this.over) return;
+        if (isBird) this.elquinesAct(spr, s);
+        else this.darkSpiritAct(spr, s);
+      },
+    });
+    this.summons[key] = { sprite: spr, endAt, ev };
+  }
+
+  private elquinesAct(spr: Phaser.GameObjects.Sprite, s: SkillDef) {
+    const b = this.boss;
+    if (!b || !b.active || b.dying) return;
+    // ボスへ舞い降りて150%×3ヒット
+    this.tweens.add({ targets: spr, x: b.x, y: b.y - 10, duration: 350, yoyo: true, hold: 200, ease: 'Sine.easeInOut' });
+    for (let k = 0; k < 3; k++) {
+      this.time.delayedCall(380 + k * 110, () => {
+        if (!b.active) return;
+        const ice = this.add.image(b.x + Phaser.Math.Between(-14, 14), b.y - 6, 'fx_ice_0').setDepth(13).setScale(1.2).setTint(0x9ad8ff);
+        this.tweens.add({ targets: ice, alpha: 0, scale: 0.4, duration: 220, onComplete: () => ice.destroy() });
+        this.hitEnemy(b, s.mult, 1);
+      });
+    }
+    sfx('fire');
+  }
+
+  private darkSpiritAct(spr: Phaser.GameObjects.Sprite, s: SkillDef) {
+    const roll = Phaser.Math.Between(0, 3);
+    if (roll === 0) {
+      // 多段攻撃
+      const b = this.boss;
+      if (b && b.active && !b.dying) {
+        this.tweens.add({ targets: spr, x: b.x, y: b.y, duration: 300, yoyo: true, hold: 150 });
+        for (let k = 0; k < s.hits; k++) {
+          this.time.delayedCall(320 + k * 100, () => { if (b.active) { this.boltFx(b.x, b.y, 1); this.hitEnemy(b, s.mult, 1); } });
+        }
+      }
+      sfx('claw');
+    } else if (roll === 1) {
+      // 回復
+      const max = this.maxHp(this.progress.charKey);
+      const heal = Math.floor(max * 0.18);
+      this.charState.hp = Math.min(max, this.charState.hp + heal);
+      this.floatText(this.player.x, this.player.y - 26, `+${fmt(heal)}`, '#6ae45a');
+      const fx = this.add.sprite(this.player.x, this.player.y - 8, 'fx_heal_0').setDepth(13).setScale(1.2);
+      fx.play('fx_heal_play'); this.tweens.add({ targets: fx, y: fx.y - 16, alpha: 0, duration: 700, onComplete: () => fx.destroy() });
+      sfx('heal');
+    } else {
+      // 攻撃力/防御力/クリティカルのいずれか +30% を5秒
+      const kind = Phaser.Math.Between(0, 2);
+      this.sumBuff.until = this.time.now + 5000;
+      this.sumBuff.atk = kind === 0 ? 1.3 : 1;
+      this.sumBuff.def = kind === 1 ? 0.7 : 1;
+      this.sumBuff.crit = kind === 2 ? 0.3 : 0;
+      const label = kind === 0 ? '攻撃力+30%' : kind === 1 ? '防御力+30%' : 'クリティカル+30%';
+      const color = kind === 0 ? '#ff7a3a' : kind === 1 ? '#6ab0ff' : '#ffd24a';
+      this.floatText(this.player.x, this.player.y - 30, label, color);
+      const aura = this.add.circle(this.player.x, this.player.y, 8, Phaser.Display.Color.HexStringToColor(color).color, 0.5).setDepth(9);
+      this.tweens.add({ targets: aura, radius: 28, alpha: 0, duration: 480, onUpdate: () => aura.setRadius(aura.radius), onComplete: () => aura.destroy() });
+      sfx('select');
+    }
   }
 
   // ---- スキル実装 ----
@@ -1294,7 +1458,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // 多段ヒット + MISS判定 + レベル差補正
-  private hitEnemy(e: BossSprite, mult: number, hits: number, flat = false) {
+  private hitEnemy(e: BossSprite, mult: number, hits: number, flat = false, bonusDmg = 0) {
     if (!e.active || e.dying) return;
     // 無限ボス: MISSなし・格上補正なし(自分の素の火力を計測)
     const hitChance = this.infinite ? 1 : playerHitChance(this.progress.level, this.er(e.floor));
@@ -1303,10 +1467,12 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(i * 75, () => {
         if (!e.active || e.dying) return;
         if (Math.random() > hitChance) { this.missNumber(e); return; }
-        const crit = Math.random() < critRate(this.progress.level);
+        // 召喚獣のクリティカルバフを加算
+        const critP = critRate(this.progress.level) + (this.time.now < this.sumBuff.until ? this.sumBuff.crit : 0);
+        const crit = Math.random() < critP;
         const frozen = e.frozenUntil && this.time.now < e.frozenUntil ? 1.3 : 1;
         const dmg = Math.max(1, Math.floor(
-          this.atk() * mult * dmgScale * Phaser.Math.FloatBetween(0.92, 1.08) * (crit ? critMul(this.progress.level) : 1) * frozen
+          this.atk() * mult * dmgScale * Phaser.Math.FloatBetween(0.92, 1.08) * (crit ? critMul(this.progress.level) : 1) * frozen + bonusDmg
         ));
         e.lastHitAt = this.time.now;
         sfx(crit ? 'crit' : 'hit');
@@ -1481,7 +1647,8 @@ export default class GameScene extends Phaser.Scene {
 
     this.invulnUntil = now + 900;
     const buff = this.buffs[this.progress.charKey];
-    const defMul = now < buff.until ? buff.def : 1;
+    const sumDef = now < this.sumBuff.until ? this.sumBuff.def : 1; // 召喚防御バフ
+    const defMul = (now < buff.until ? buff.def : 1) * sumDef;
     const lvMul = enemyDamageScale(this.progress.level, this.er(this.floor));
     const dmg = Math.max(1, Math.floor(rawAtk * Phaser.Math.FloatBetween(0.85, 1.15) * defMul * lvMul));
     this.charState.hp = Math.max(0, this.charState.hp - dmg);
@@ -1614,8 +1781,40 @@ export default class GameScene extends Phaser.Scene {
     this.updateBoss();
     this.updateShots();
     this.updatePickups();
+    this.updateSummons();
     if (!this.infinite) this.updatePortal();
     this.syncUiState();
+  }
+
+  // 召喚獣: プレイヤーに追従させ、時間切れで消す
+  private updateSummons() {
+    const now = this.time.now;
+    for (const key of Object.keys(this.summons)) {
+      const s = this.summons[key];
+      if (now >= s.endAt || !s.sprite.active) {
+        s.ev.remove();
+        if (s.sprite.active) this.tweens.add({ targets: s.sprite, alpha: 0, scale: 0.3, duration: 300, onComplete: () => s.sprite.destroy() });
+        delete this.summons[key];
+        continue;
+      }
+      // 攻撃中(tween移動中)でなければプレイヤーの斜め上をふわふわ追従
+      if (!this.tweens.isTweening(s.sprite)) {
+        const ox = key === 'elquines' ? -34 : 34;
+        const tx = this.player.x + ox;
+        const ty = this.player.y - 44 + Math.sin(now / 400 + (key === 'elquines' ? 0 : 2)) * 8;
+        s.sprite.x += (tx - s.sprite.x) * 0.12;
+        s.sprite.y += (ty - s.sprite.y) * 0.12;
+        s.sprite.setFlipX((this.boss?.x ?? this.player.x) < s.sprite.x);
+      }
+    }
+  }
+
+  private clearSummons() {
+    for (const key of Object.keys(this.summons)) {
+      this.summons[key].ev.remove();
+      this.summons[key].sprite.destroy();
+      delete this.summons[key];
+    }
   }
 
   // 無限ボス終了 → 結果表示
@@ -1649,6 +1848,12 @@ export default class GameScene extends Phaser.Scene {
 
   private updatePlayerMove() {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+    // フリージングブレス等で行動不能(移動・ジャンプ不可)。攻撃キーは別途skill側で抑止
+    if (this.time.now < this.inputLockUntil) {
+      body.setVelocityX(0);
+      this.upPrev = true;
+      return;
+    }
     const left = this.pad.left || this.cursors.left.isDown;
     const right = this.pad.right || this.cursors.right.isDown;
     const up = this.pad.up || this.cursors.up.isDown || this.keys.SPACE.isDown || this.keys.Z.isDown;
@@ -1723,7 +1928,8 @@ export default class GameScene extends Phaser.Scene {
     const enraged = b.hp < b.maxhp * 0.5;
     // ダッシュ攻撃などで速度が高い間はAIの移動を上書きしない
     const dashing = Math.abs(body.velocity.x) > 180 || Math.abs(body.velocity.y) > 200;
-    const spd = (b.floor.archetype === 'beast' ? 78 : 52) * (enraged ? 1.4 : 1);
+    const slowed = b.slowUntil && this.time.now < b.slowUntil ? 0.5 : 1; // フリージングブレスの減速
+    const spd = (b.floor.archetype === 'beast' ? 78 : 52) * (enraged ? 1.4 : 1) * slowed;
     // アーキタイプごとの基準間合い(近接ボスは近め、遠隔ボスは遠め)
     const keep = ({ golem: 46, mush: 50, beast: 40, knight: 44, drake: 96, demon: 100, clown: 104, witch: 118, lord: 122 } as Record<string, number>)[b.floor.archetype] ?? 70;
     const dx = this.player.x - b.x;

@@ -20,6 +20,9 @@ export type SkillKind =
   | 'meteor'     // 隕石/ブリザード(降下多段)
   | 'nova'       // 全画面多段
   | 'channel'    // キーダウン継続発動(ピアスサイクロン)
+  | 'breath'     // キーダウン氷ブレス(無敵+減速デバフ)
+  | 'gungnir'    // 神槍投擲(最大HP比例の多段)
+  | 'summon'     // 召喚獣(エルクィネス/ダークスピリット)
   | 'heal';      // 回復
 
 export interface SkillDef {
@@ -108,8 +111,8 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 60, jobName: 'ダークナイト', rankName: '4次', spriteKey: 'warrior4', atkBonus: 2.0,
         skills: [
           { id: 'w4a', name: 'サウザンドスピア', mp: 6, cd: 850, kind: 'melee', mult: 1.6, hits: 6, range: 62 },
-          { id: 'w4b', name: 'ガングニールの降臨', mp: 11, cd: 2000, kind: 'aoe', mult: 1.8, hits: 5, radius: 110 },
-          { id: 'w4c', name: 'ビホルダー', mp: 13, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.5 },
+          { id: 'w4b', name: 'グングニル', mp: 14, cd: 4500, kind: 'gungnir', mult: 2.25, hits: 12, targets: 3 },
+          { id: 'w4c', name: 'ダークスピリット', mp: 14, cd: 30000, kind: 'summon', mult: 1.3, hits: 3, durMs: 30000 },
         ],
       },
       {
@@ -161,13 +164,13 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'm4a', name: 'ブリザード', mp: 7, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 1000 },
           { id: 'm4b', name: 'チェーンライトニング', mp: 8, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
-          { id: 'm4c', name: 'イフリート', mp: 11, cd: 12000, kind: 'heal', mult: 0, hits: 0, healPct: 0.55 },
+          { id: 'm4c', name: 'エルクィネス', mp: 12, cd: 20000, kind: 'summon', mult: 1.5, hits: 3, targets: 3, durMs: 20000 },
         ],
       },
       {
         minLevel: 100, jobName: 'アークメイジ・極', rankName: '5次', spriteKey: 'mage5', atkBonus: 2.6,
         skills: [
-          { id: 'm5a', name: 'フローズンオーブ', mp: 7, cd: 1000, kind: 'projectile', mult: 1.8, hits: 4, speed: 300, pierce: true },
+          { id: 'm5a', name: 'フリージングブレス', mp: 10, cd: 10000, kind: 'breath', mult: 1.2, hits: 4, targets: 8, range: 200, durMs: 5000 },
           { id: 'm5b', name: 'サンダーブレイク', mp: 11, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
           { id: 'm5c', name: 'ブリザードストーム', mp: 13, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 1200 },
         ],
