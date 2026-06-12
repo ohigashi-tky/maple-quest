@@ -516,6 +516,7 @@ export default class GameScene extends Phaser.Scene {
     b.setTint(f.tint);
     b.play(`boss_${f.archetype}_move`);
     b.setDepth(8);
+    b.setCollideWorldBounds(true);  // 巨大ボスが画面外に出ないように
     const bw = b.width * 0.6, bh = b.height * 0.75;
     b.setSize(bw, bh).setOffset((b.width - bw) / 2, b.height - bh);
     if (flying) (b.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
@@ -550,7 +551,7 @@ export default class GameScene extends Phaser.Scene {
     b.aiTimer = 0;
     b.touchCd = 0;
     b.dir = -1;
-    b.setScale(4.2);       // かなり大きめ
+    b.setScale(5.0);       // かなり大きめ
     b.setTint(0x8a3acc);
     b.play('boss_titan_move');
     b.setDepth(8);
@@ -596,6 +597,7 @@ export default class GameScene extends Phaser.Scene {
       golem: ['slam', 'spikes', 'rain', 'volley'],        // 巨人: 叩きつけ・岩飛ばし
       demon: ['fan', 'homing', 'ring', 'dash'],           // 魔神: 火球弾幕・突進
       drake: ['fan', 'rain', 'beam', 'spiral'],           // 竜: ブレス・薙ぎ払い
+      horntail: ['fan', 'rain', 'beam', 'spiral', 'ring'], // 双頭竜: 両頭からの猛弾幕
       beast: ['dash', 'fan', 'spikes', 'volley'],         // 猛獣: 急襲・爪連撃
       knight: ['dash', 'slam', 'volley', 'beam'],         // 騎士: 斬り込み・剣圧・突き
       witch: ['bolt', 'homing', 'spiral', 'rain'],        // 魔女: 呪詛弾・落雷・血の雨
@@ -676,7 +678,7 @@ export default class GameScene extends Phaser.Scene {
           land.remove();
           this.cameras.main.shake(140, 0.0015);
           sfx('thunder');
-          this.shockwaveAt(b.x, b.atk, 84 * b.floor.scale);
+          this.shockwaveAt(b.x, b.atk, 56 * b.floor.scale);  // スケール1.5倍後も実効半径は維持
         }
       },
     });
@@ -763,7 +765,7 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(i * 90, () => {
         if (!b.active || this.over) return;
         const tx = cx + Phaser.Math.Between(-90, 90);
-        this.eShot(b, tx, -10, b.floor.archetype === 'drake' ? 'fx_ice_0' : 'fx_fire_0', Phaser.Math.Between(-20, 20), 200, 1, 3000);
+        this.eShot(b, tx, -10, b.floor.archetype === 'drake' || b.floor.archetype === 'horntail' ? 'fx_ice_0' : 'fx_fire_0', Phaser.Math.Between(-20, 20), 200, 1, 3000);
         sfx('fire');
       });
     }
@@ -1982,6 +1984,11 @@ export default class GameScene extends Phaser.Scene {
     if (!b || !b.active || b.dying) return;
     const now = this.time.now;
     const body = b.body as Phaser.Physics.Arcade.Body;
+
+    // 巨大ボスが壁際で見切れないよう、表示幅ベースで位置をクランプ
+    const halfW = Math.min(b.displayWidth / 2, ARENA_W / 2 - 10);
+    if (b.x < halfW) { b.x = halfW; if (body.velocity.x < 0) body.setVelocityX(0); }
+    else if (b.x > ARENA_W - halfW) { b.x = ARENA_W - halfW; if (body.velocity.x > 0) body.setVelocityX(0); }
 
     // 接触ダメージ
     if (now > b.touchCd &&

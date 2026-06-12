@@ -11,7 +11,7 @@ await page.evaluate(()=>{
   t.add.rectangle(270, 480, 540, 960, 0x14101e, 1).setDepth(900);
   const items = [
     ['boss_mush', 0xef7d2f, 'マッシュ'], ['boss_demon', 0xd81a1a, '悪魔'],
-    ['boss_drake', 0x3aa84a, '竜'], ['boss_golem', 0xd8541a, 'ゴーレム'],
+    ['boss_drake', 0x4a9c3a, '竜'], ['boss_horntail', 0x3aa84a, 'ホーンテイル'], ['boss_golem', 0xd8541a, 'ゴーレム'],
     ['boss_beast', 0xe0a030, '猛禽'], ['boss_knight', 0x3a6ae8, '騎士'],
     ['boss_witch', 0x8a1a4a, '魔女'], ['boss_clown', 0xb04ad8, '道化'],
     ['boss_lord', 0x6a52b4, '魔導王'], ['boss_titan', 0x8a3acc, '巨神'],

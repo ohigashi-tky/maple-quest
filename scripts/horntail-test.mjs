@@ -1,0 +1,17 @@
+import puppeteer from 'puppeteer-core';
+const browser = await puppeteer.launch({ executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless:'new', args:['--no-sandbox','--mute-audio'], defaultViewport:{width:390,height:844,isMobile:true,hasTouch:true,deviceScaleFactor:2} });
+const page = await browser.newPage();
+const errs=[]; page.on('pageerror',e=>errs.push(e.message));
+await page.goto('http://localhost:4173/', { waitUntil:'networkidle0' });
+await page.evaluate(()=>localStorage.setItem('maple-quest-save-v3', JSON.stringify({level:200,exp:0,charKey:'warrior',highestByDiff:[16,1,1,1],clearedByDiff:[false,false,false,false],clears:0})));
+await page.reload({ waitUntil:'networkidle0' });
+await new Promise(r=>setTimeout(r,2000));
+await page.evaluate(()=>{ const g=window.__PHASER_GAME__; g.scene.getScene('Title').scene.start('Game',{floor:16,difficulty:0}); });
+await new Promise(r=>setTimeout(r,2600));
+await page.evaluate(()=>{ const s=window.__PHASER_GAME__.scene.getScene('Game'); if(s.boss) s.player.x = s.boss.x - 80; });
+await new Promise(r=>setTimeout(r,400));
+const info = await page.evaluate(()=>{ const s=window.__PHASER_GAME__.scene.getScene('Game'); return { boss: s.boss?.texture.key, scale: s.boss?.scaleX, name: s.uiState.bossName }; });
+console.log('16階:', JSON.stringify(info));
+await page.screenshot({ path:'/tmp/horntail.png' });
+console.log(errs.length?'ERR:'+errs.join('|'):'no errors');
+await browser.close();

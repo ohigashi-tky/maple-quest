@@ -247,8 +247,8 @@ export interface FloorDef {
   scale: number;
 }
 
-// モンスター型: mush/demon/drake/golem/beast   人型: knight/witch/clown/lord
-export type BossArchetype = 'mush' | 'demon' | 'drake' | 'golem' | 'beast' | 'knight' | 'witch' | 'clown' | 'lord';
+// モンスター型: mush/demon/drake/horntail/golem/beast   人型: knight/witch/clown/lord
+export type BossArchetype = 'mush' | 'demon' | 'drake' | 'horntail' | 'golem' | 'beast' | 'knight' | 'witch' | 'clown' | 'lord';
 
 // エリア/ダンジョンボスを弱→強で配置(★=5階層ごとの強敵)。人型と怪物型を作り分け
 interface FloorSeed {
@@ -274,7 +274,7 @@ const FLOOR_SEEDS: FloorSeed[] = [
   { key: 'hilla', name: 'ヒルラ', title: '血の魔女', req: 136, arch: 'witch', tint: 0x8a1a4a, scale: 1.55 },
   { key: 'zakum', name: 'ザクム', title: '炎の巨神', req: 150, arch: 'golem', tint: 0xd8541a, major: true, scale: 2.7 },
 
-  { key: 'horntail', name: 'ホーンテイル', title: '双頭の邪龍', req: 168, arch: 'drake', tint: 0x3aa84a, scale: 1.9 },
+  { key: 'horntail', name: 'ホーンテイル', title: '双頭の邪龍', req: 168, arch: 'horntail', tint: 0x3aa84a, scale: 2.4 },
   { key: 'magnus', name: 'マグナス', title: '堕ちた翼', req: 186, arch: 'knight', tint: 0x3a3a4a, scale: 1.65 },
   { key: 'lucid', name: 'ルシード', title: '夢幻の蝶', req: 204, arch: 'witch', tint: 0x6ad8c4, scale: 1.6 },
   { key: 'damien', name: 'デミアン', title: '絶望の剣', req: 224, arch: 'knight', tint: 0xc02a3a, scale: 1.7 },
@@ -310,7 +310,7 @@ export const FLOORS: FloorDef[] = FLOOR_SEEDS.map((s, i) => ({
   theme: themeForFloor(i + 1),
   archetype: s.arch,
   tint: s.tint,
-  scale: s.scale ?? 1.5,
+  scale: (s.scale ?? 1.5) * 1.5,  // 全ボス1.5倍(迫力重視)
 }));
 
 export const TOTAL_FLOORS = FLOORS.length;

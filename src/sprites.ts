@@ -1361,6 +1361,61 @@ const A_DRAKE: SpriteDef = {
   ],
 };
 
+// horntail: 2つの頭と首を持つ双頭の邪龍(ホーンテイル専用)
+const A_HORNTAIL: SpriteDef = {
+  palette: ARCH_PAL,
+  frames: [
+    [
+      '..oo.......oo....oo.......oo..',
+      '.oddo.....oddo..oddo.....oddo.',
+      '..oddo...oddo....oddo...oddo..',
+      '..oobbbbbboo......oobbbbbboo..',
+      '.obggkbbbbbo......obbbbbkggbo.',
+      'obbggbbbbbbo......obbbbbbggbbo',
+      'obwwwwbbbbbo......obbbbbwwwwbo',
+      '.owwoobbbbbo......obbbbboowwo.',
+      '.oo..obbbbbo......obbbbbo..oo.',
+      '.....obbbbbbo....obbbbbbo.....',
+      '......obbbbbbo..obbbbbbo......',
+      '.oo....obbbbbboobbbbbbo....oo.',
+      'obbo....obbbbbbbbbbbbo....obbo',
+      'obbboooobbbbbbbbbbbbbboooobbbo',
+      '.obbbbbbbbbbbbbbbbbbbbbbbbbbo.',
+      '..obbbbbblllllllllllbbbbbbbo..',
+      '...obbdbbbbbbbbbbbbbbbdbbo....',
+      '....obbbbbbbbbbbbbbbbbbboo....',
+      '.....obbobbbbbbbbbobbbo.oo....',
+      '.....obo..obbo.obbo.obo.......',
+      '....obbo..obo...obo..obbo.....',
+      '....oo....oo.....oo....oo.....',
+    ],
+    [
+      '..oo.......oo....oo.......oo..',
+      '.oddo.....oddo..oddo.....oddo.',
+      '..oddo...oddo....oddo...oddo..',
+      '..oobbbbbboo......oobbbbbboo..',
+      '.obggkbbbbbo......obbbbbkggbo.',
+      'obbggbbbbbbo......obbbbbbggbbo',
+      'obwwwwbbbbbo......obbbbbwwwwbo',
+      '.owwoobbbbbo......obbbbboowwo.',
+      '.oo..obbbbbbo....obbbbbbo..oo.',
+      '.....obbbbbbo....obbbbbbo.....',
+      '.oo....obbbbbo..obbbbbo....oo.',
+      'obbo....obbbbboobbbbbo....obbo',
+      'obbbo....obbbbbbbbbbo....obbbo',
+      'obbbboooobbbbbbbbbbbboooobbbbo',
+      '.obbbbbbbbbbbbbbbbbbbbbbbbbbo.',
+      '..obbbbbblllllllllllbbbbbbbo..',
+      '...obbdbbbbbbbbbbbbbbbdbbo....',
+      '....obbbbbbbbbbbbbbbbbbboo....',
+      '.....obbobbbbbbbbbobbboooo....',
+      '.....obbo..obo.obo..obbo......',
+      '....obbo...obbo.obbo..oo......',
+      '....oo......oo...oo...........',
+    ],
+  ],
+};
+
 // golem: 岩の巨人(光る目・胸の溶岩コア・巨大な拳)(スタンピー・ザクム)
 const A_GOLEM: SpriteDef = {
   palette: ARCH_PAL,
@@ -1893,6 +1948,7 @@ const SPRITES: Record<string, SpriteDef> = {
   boss_mush: A_MUSH,
   boss_demon: A_DEMON,
   boss_drake: A_DRAKE,
+  boss_horntail: A_HORNTAIL,
   boss_golem: A_GOLEM,
   boss_beast: A_BEAST,
   boss_knight: A_KNIGHT,
@@ -2166,7 +2222,7 @@ export function createAllAnims(scene: Phaser.Scene) {
     mk(`${who}_attack`, who, [3], 1, 0);
   }
   // ボスアーキタイプの待機(浮遊・揺れ)アニメ
-  for (const a of ['boss_mush', 'boss_demon', 'boss_drake', 'boss_golem', 'boss_beast', 'boss_knight', 'boss_witch', 'boss_clown', 'boss_lord', 'boss_titan']) {
+  for (const a of ['boss_mush', 'boss_demon', 'boss_drake', 'boss_horntail', 'boss_golem', 'boss_beast', 'boss_knight', 'boss_witch', 'boss_clown', 'boss_lord', 'boss_titan']) {
     mk(`${a}_move`, a, [0, 1], 3);
   }
   mk('mushmom_move', 'mushmom', [0, 1], 3);
