@@ -37,8 +37,10 @@ export interface SkillDef {
   pierce?: boolean;
   healPct?: number;
   durMs?: number;
-  atkBuff?: number;
-  defCut?: number;
+  atkBuff?: number;  // 攻撃力倍率(>1)
+  defCut?: number;   // 被ダメージ倍率(<1=軽減)
+  hpBuff?: number;   // 最大HP倍率(>1)
+  cdCut?: number;    // スキルCT倍率(<1=短縮)
 }
 
 export interface JobTier {
@@ -83,7 +85,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'w1a', name: 'パワーストライク', mp: 4, cd: 700, kind: 'melee', mult: 1.6, hits: 2, range: 40 },
           { id: 'w1b', name: 'スラッシュブラスト', mp: 6, cd: 1400, kind: 'aoe', mult: 1.2, hits: 2, radius: 66 },
-          { id: 'w1c', name: 'アイアンボディ', mp: 7, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
+          { id: 'w1c', name: 'アイアンボディ', mp: 7, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.5 },
         ],
       },
       {
@@ -91,7 +93,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'w2a', name: 'スピアクラッシュ', mp: 4, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
           { id: 'w2b', name: 'ファイナルアタック', mp: 7, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
-          { id: 'w2c', name: 'ハイパーボディ', mp: 10, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.3, defCut: 0.6 },
+          { id: 'w2c', name: 'ハイパーボディ', mp: 10, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, hpBuff: 1.6, defCut: 0.85 },
         ],
       },
       {
@@ -99,7 +101,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'w3a', name: 'ドラゴンバスター', mp: 5, cd: 800, kind: 'melee', mult: 1.7, hits: 4, range: 56 },
           { id: 'w3b', name: 'ドラゴンフューリー', mp: 8, cd: 1700, kind: 'aoe', mult: 1.5, hits: 4, radius: 90 },
-          { id: 'w3c', name: 'ドラゴンブラッド', mp: 11, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
+          { id: 'w3c', name: 'ドラゴンブラッド', mp: 11, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, atkBuff: 1.6 },
         ],
       },
       {
@@ -135,7 +137,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'm1a', name: 'エナジーボルト', mp: 3, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
           { id: 'm1b', name: 'マジッククロー', mp: 5, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
-          { id: 'm1c', name: 'マジックガード', mp: 6, cd: 14000, kind: 'buff', mult: 0, hits: 0, durMs: 9000, defCut: 0.55 },
+          { id: 'm1c', name: 'マジックガード', mp: 6, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.45 },
         ],
       },
       {
@@ -143,7 +145,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'm2a', name: 'コールドビーム', mp: 4, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 900 },
           { id: 'm2b', name: 'サンダーボルト', mp: 6, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
-          { id: 'm2c', name: 'メディテーション', mp: 8, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 11000, atkBuff: 1.35 },
+          { id: 'm2c', name: 'メディテーション', mp: 8, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, atkBuff: 1.45 },
         ],
       },
       {
@@ -151,7 +153,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         skills: [
           { id: 'm3a', name: 'アイスストライク', mp: 5, cd: 1100, kind: 'freeze', mult: 1.6, hits: 3, radius: 100, durMs: 1100 },
           { id: 'm3b', name: 'ライトニングボルト', mp: 7, cd: 1500, kind: 'thunder', mult: 1.5, hits: 1, targets: 5, range: 130 },
-          { id: 'm3c', name: 'スペルブースター', mp: 9, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 12000, atkBuff: 1.5 },
+          { id: 'm3c', name: 'スペルブースター', mp: 9, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, cdCut: 0.55 },
         ],
       },
       {
