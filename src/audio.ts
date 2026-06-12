@@ -8,20 +8,81 @@ let bgmGain: GainNode | null = null;
 let bgmTimer: ReturnType<typeof setInterval> | null = null;
 let muted = false;
 
-export function initAudio() {
-  if (ctx) {
-    if (ctx.state === 'suspended') ctx.resume();
-    return;
-  }
+function buildContext() {
   const AC = window.AudioContext || (window as any).webkitAudioContext;
   if (!AC) return;
   ctx = new AC();
   masterGain = ctx.createGain();
-  masterGain.gain.value = 0.5;
+  masterGain.gain.value = muted ? 0 : 0.5;
   masterGain.connect(ctx.destination);
   bgmGain = ctx.createGain();
   bgmGain.gain.value = 0.32;
   bgmGain.connect(masterGain);
+  // iOSは録画/通話/Siri開始でstateが'interrupted'になる → 検知して回復
+  ctx.onstatechange = () => ensureAudioHealth(true);
+}
+
+export function initAudio() {
+  if (ctx) {
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    return;
+  }
+  buildContext();
+  installAudioWatchdog();
+}
+
+// ============================================================
+// iOS画面録画対策:
+// 録画開始でハードウェアのサンプルレートが切り替わる(44.1kHz→48kHz)と、
+// 既存AudioContextはレート不一致のまま動き続け、音が低く歪んで録音される(WebKit既知バグ)。
+// → レート不一致を検知したらAudioContextを作り直し、BGMを同じ曲で再開する。
+// ============================================================
+let watchdogInstalled = false;
+let lastProbeAt = 0;
+
+function installAudioWatchdog() {
+  if (watchdogInstalled) return;
+  watchdogInstalled = true;
+  const onEvent = () => ensureAudioHealth(true);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) onEvent(); });
+  window.addEventListener('focus', onEvent);
+  window.addEventListener('pageshow', onEvent);
+  // タップのたびに軽いチェック(必要ならresume)。レート照合は時間で間引く
+  document.addEventListener('pointerdown', () => ensureAudioHealth(false), { passive: true });
+  setInterval(() => ensureAudioHealth(false), 2000);
+}
+
+function ensureAudioHealth(probeNow: boolean) {
+  if (!ctx) return;
+  if (document.hidden) return;  // 非表示中は何もしない(バックグラウンド再生を防ぐ)
+  const st = ctx.state as string;
+  if (st === 'interrupted' || st === 'suspended') ctx.resume().catch(() => {});
+  // ハードウェアの現在レートを一時コンテキストで照合(作成コストがあるので間引く)
+  const now = Date.now();
+  const minGap = probeNow ? 1200 : 8000;
+  if (now - lastProbeAt < minGap || document.visibilityState !== 'visible') return;
+  lastProbeAt = now;
+  try {
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    const probe = new AC();
+    const hwRate = probe.sampleRate;
+    probe.close().catch(() => {});
+    if (ctx && hwRate && ctx.sampleRate !== hwRate) rebuildAudio();
+  } catch { /* ignore */ }
+}
+
+// レート不一致時: コンテキストを作り直してBGMを同じ曲から再開
+function rebuildAudio() {
+  const song = currentSong;
+  stopBgm();
+  try { ctx?.close().catch(() => {}); } catch { /* ignore */ }
+  ctx = null; masterGain = null; bgmGain = null;
+  buildContext();
+  if (song) {
+    currentSong = null;
+    playBgm(song as keyof typeof SONGS);
+  }
 }
 
 export function setMuted(m: boolean) {
@@ -292,6 +353,14 @@ export function playBgm(name: keyof typeof SONGS | null) {
   const LOOKAHEAD = 0.18; // 秒: この先までを予約
   const tick = () => {
     if (!ctx) return;
+    // 録画開始などの中断でオーディオ時計が飛んだ場合、過去分のステップは
+    // 予約せずに現在へ追従する(溜まった音が一斉に鳴る「ボーン」を防止)
+    if (nextTime < ctx.currentTime - 0.05) {
+      const behind = ctx.currentTime + 0.06 - nextTime;
+      const skip = Math.ceil(behind / stepDur);
+      step = (step + skip) % song.lead.length;
+      nextTime += skip * stepDur;
+    }
     while (nextTime < ctx.currentTime + LOOKAHEAD) {
       if (!muted) scheduleStep(song, step, nextTime, stepDur);
       nextTime += stepDur;
