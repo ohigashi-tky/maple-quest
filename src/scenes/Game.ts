@@ -64,6 +64,7 @@ interface BossSprite extends Phaser.Physics.Arcade.Sprite {
   dying?: boolean;
   frozenUntil?: number;
   stunUntil?: number;
+  flashAt?: number;     // 直近の被弾フラッシュ時刻(点滅の間引き用)
   dmgStackAt?: number;  // 直近のダメージ表示時刻(多段の積み重ね用)
   dmgStackN?: number;   // 連続ヒット数
   slowUntil?: number;   // フリージングブレスの減速デバフ
@@ -598,7 +599,7 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(380, () => {
         if (!b.active || this.over) { rift.destroy(); glow.destroy(); return; }
         this.tweens.add({ targets: b, alpha: 1, scaleX: fsx, scaleY: fsy, duration: 380, ease: 'Back.easeOut' });
-        this.cameras.main.shake(120, 0.0015);
+        this.cameras.main.shake(120, 0.00068);
         sfx('thunder');
         this.time.delayedCall(380, () => {
           if (b.active) (b.body as Phaser.Physics.Arcade.Body).enable = true;
@@ -635,7 +636,7 @@ export default class GameScene extends Phaser.Scene {
     this.bosses = [b];
     this.bossActive = true;
 
-    this.cameras.main.shake(260, 0.003);
+    this.cameras.main.shake(260, 0.00135);
     this.cameras.main.flash(360, 200, 120, 255);
     sfx('thunder');
 
@@ -749,7 +750,7 @@ export default class GameScene extends Phaser.Scene {
         const bd = b.body as Phaser.Physics.Arcade.Body;
         if (bd.blocked.down && bd.velocity.y >= 0 && land.getOverallProgress() > 0.1) {
           land.remove();
-          this.cameras.main.shake(140, 0.0015);
+          this.cameras.main.shake(140, 0.00068);
           sfx('thunder');
           this.shockwaveAt(b.x, b.atk, 56 * b.floor.scale);  // スケール1.5倍後も実効半径は維持
         }
@@ -821,7 +822,7 @@ export default class GameScene extends Phaser.Scene {
           if (this.over) return;
           const bolt = this.add.image(tx, GROUND_Y - 50, 'fx_bolt_0').setDepth(12).setScale(1.4, 4).setTint(b.floor.tint);
           sfx('thunder');
-          this.cameras.main.shake(90, 0.0013);
+          this.cameras.main.shake(90, 0.00059);
           this.tweens.add({ targets: bolt, alpha: 0, duration: 300, onComplete: () => bolt.destroy() });
           if (Math.abs(this.player.x - tx) < 18 && this.player.y > GROUND_Y - 130) this.hurtPlayer(b.atk * 1.05);
         });
@@ -893,7 +894,7 @@ export default class GameScene extends Phaser.Scene {
       warn.destroy();
       if (this.over || !b.active) return;
       sfx('thunder');
-      this.cameras.main.shake(120, 0.003);
+      this.cameras.main.shake(120, 0.00135);
       const beam = this.add.rectangle(b.x, y, 360, 16, b.floor.tint, 0.9).setDepth(12).setOrigin(dir > 0 ? 0 : 1, 0.5);
       this.tweens.add({ targets: beam, alpha: 0, scaleY: 2, duration: 280, onComplete: () => beam.destroy() });
       // ビームライン上にいれば被弾
@@ -1048,13 +1049,13 @@ export default class GameScene extends Phaser.Scene {
         this.aoeDamage(this.player.x, this.player.y, radius, s.mult, s.hits, true); // 1段目に重ねる表示
       },
     });
-    this.cameras.main.shake(120, 0.003);
+    this.cameras.main.shake(120, 0.00135);
   }
 
   // ダークインペール: 上から下へ振り下ろす黒×赤の闇斬撃(300%×6)
   private skDarkImpale(s: SkillDef) {
     sfx('slashpro');
-    this.cameras.main.shake(180, 0.005);
+    this.cameras.main.shake(180, 0.00225);
     const dir = this.facing;
     const cx = this.player.x + dir * 30;
     const topY = this.player.y - 60;
@@ -1091,7 +1092,7 @@ export default class GameScene extends Phaser.Scene {
   // ダークシンセンス: 闇の大きな斜め十字が周囲に多発し、広範囲の敵(最大10体)を10回斬る
   private skDarkCross(s: SkillDef) {
     sfx('slashpro');
-    this.cameras.main.shake(220, 0.004);
+    this.cameras.main.shake(220, 0.0018);
     this.cameras.main.flash(140, 70, 0, 90);
     const radius = s.radius ?? 190;
     const cx = this.player.x, cy = this.player.y - 6;
@@ -1167,13 +1168,13 @@ export default class GameScene extends Phaser.Scene {
     // 自分を氷のオーラで包む(無敵表現)
     this.player.setTint(0x9ad8ff);
     this.time.delayedCall(dur, () => { if (!this.over) this.player.clearTint(); });
-    this.cameras.main.shake(140, 0.003);
+    this.cameras.main.shake(140, 0.00135);
   }
 
   // グングニル: 神槍を投げ、最大HPに比例した致命的多段ダメージ。攻撃ごとにHP比ダメージが増加
   private skGungnir(s: SkillDef) {
     sfx('slashpro');
-    this.cameras.main.shake(160, 0.004);
+    this.cameras.main.shake(160, 0.0018);
     this.cameras.main.flash(160, 220, 230, 255);
     const dir = this.facing;
     const maxhp = this.maxHp(this.progress.charKey);
@@ -1279,7 +1280,7 @@ export default class GameScene extends Phaser.Scene {
         if (this.over) return;
         // 非常に大きな闇の爆発
         sfx('thunder');
-        this.cameras.main.shake(150, 0.0028);
+        this.cameras.main.shake(150, 0.00126);
         const radius = s.radius ?? 115;
         const core = this.add.circle(tx, ty, 14, 0x12041e, 0.95).setDepth(12);
         const ring1 = this.add.circle(tx, ty, 16, 0x7a3acc, 0.7).setDepth(12);
@@ -1405,14 +1406,14 @@ export default class GameScene extends Phaser.Scene {
         .setDepth(12).setFlipX(this.facing < 0).setScale(2.6).setTint(0xb89aff).setAlpha(0.85);
       arc.play('fx_slash_play');
       arc.once('animationcomplete', () => arc.destroy());
-      this.cameras.main.shake(70, 0.0025);
+      this.cameras.main.shake(70, 0.00113);
     }
     this.meleeHit(range, s.mult, s.hits, !!s.multi);
   }
 
   private skAoe(s: SkillDef) {
     sfx('rush');
-    this.cameras.main.shake(130, 0.005);
+    this.cameras.main.shake(130, 0.00225);
     const radius = s.radius ?? 64;
     for (let r = 0; r < 2; r++) {
       const ring = this.add.circle(this.player.x, this.player.y, 10, r ? 0xffffff : 0xffe45a, 0.4).setDepth(11);
@@ -1434,7 +1435,7 @@ export default class GameScene extends Phaser.Scene {
 
   private skWave(s: SkillDef) {
     sfx('rush');
-    this.cameras.main.shake(120, 0.004);
+    this.cameras.main.shake(120, 0.0018);
     const wave = this.physics.add.sprite(this.player.x + this.facing * 14, this.player.y + 6, 'fx_slash_0') as Phaser.Physics.Arcade.Sprite & { mult: number; pierce: boolean; hits: number; hitSet: Set<BossSprite> };
     (wave.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
     wave.setVelocityX(this.facing * 280);
@@ -1536,7 +1537,7 @@ export default class GameScene extends Phaser.Scene {
 
   private skThunder(s: SkillDef) {
     sfx('thunder');
-    this.cameras.main.shake(160, 0.006);
+    this.cameras.main.shake(160, 0.0027);
     this.cameras.main.flash(120, 200, 200, 120);
     const b = this.boss;
     if (b && b.active && Math.abs(b.x - this.player.x) < (s.range ?? 120)) {
@@ -1554,7 +1555,7 @@ export default class GameScene extends Phaser.Scene {
 
   private skFreeze(s: SkillDef, primary = false) {
     sfx(primary ? 'magicpro' : 'thunder');
-    this.cameras.main.shake(140, 0.004);
+    this.cameras.main.shake(140, 0.0018);
     const radius = s.radius ?? 90;
     const cx = this.player.x + this.facing * 30, cy = this.player.y;
     const ring = this.add.circle(cx, cy, 10, 0x9ad8ff, 0.4).setDepth(11);
@@ -1601,7 +1602,7 @@ export default class GameScene extends Phaser.Scene {
 
   private skMeteor(s: SkillDef, primary = false) {
     sfx(primary ? 'magicpro' : 'fire');
-    this.cameras.main.shake(130, 0.0035);
+    this.cameras.main.shake(130, 0.00158);
     const isIce = s.name.includes('ブリザード');
     const b = this.boss;
     const spots: { x: number; y: number }[] = [];
@@ -1634,7 +1635,7 @@ export default class GameScene extends Phaser.Scene {
     sfx('thunder');
     sfx('levelup');
     this.cameras.main.flash(400, 255, 240, 200);
-    this.cameras.main.shake(200, 0.0035);
+    this.cameras.main.shake(200, 0.00158);
     const cam = this.cameras.main;
     const left = cam.scrollX, right = cam.scrollX + cam.width / cam.zoom;
     // 自分から放射状に走る光線(独創的なバースト)
@@ -1824,10 +1825,14 @@ export default class GameScene extends Phaser.Scene {
         this.damageNumber(e, dmg, crit, flat);
         const star = this.add.image(e.x, e.y - 6, 'fx_star_0').setDepth(13).setScale(crit ? 1.6 : 1.0);
         this.tweens.add({ targets: star, alpha: 0, scale: 0.3, angle: 90, duration: 240, onComplete: () => star.destroy() });
-        e.setTintFill(crit ? 0xc8b070 : 0xb0acc0);  // 落ち着いた明るさ(眩しさ軽減)
-        const titanTint = this.infinite ? 0x8a3acc : e.floor.tint;
-        const frozenNow = e.frozenUntil && this.time.now < e.frozenUntil;
-        this.time.delayedCall(70, () => e.active && (frozenNow ? e.setTint(0x9ad8ff) : e.setTint(titanTint)));
+        // チカチカ軽減: 点滅は0.25秒に1回まで・ごく薄い色で短く(多段でも穏やか)
+        if (!e.flashAt || this.time.now - e.flashAt > 250) {
+          e.flashAt = this.time.now;
+          e.setTintFill(crit ? 0x9a8e6a : 0x8a8694);
+          const titanTint = this.infinite ? 0x8a3acc : e.floor.tint;
+          const frozenNow = e.frozenUntil && this.time.now < e.frozenUntil;
+          this.time.delayedCall(45, () => e.active && (frozenNow ? e.setTint(0x9ad8ff) : e.setTint(titanTint)));
+        }
 
         if (this.infinite) {
           this.applyInfiniteDamage(e, dmg);
@@ -1921,7 +1926,7 @@ export default class GameScene extends Phaser.Scene {
     this.gainExp(Math.floor(bossExp(e.floor, this.progress.difficulty) * (e.expMul ?? 1)));
     const remain = this.bosses.some((x) => x !== e && x.active && !x.dying);
     this.bossActive = remain;
-    this.cameras.main.shake(320, 0.004);
+    this.cameras.main.shake(320, 0.0018);
     this.cameras.main.flash(400, 255, 255, 255);
     this.tweens.add({
       targets: e, alpha: 0, y: e.y - 14, scaleX: e.scaleX * 1.1, scaleY: e.scaleY * 1.1, duration: 900,
@@ -2017,7 +2022,7 @@ export default class GameScene extends Phaser.Scene {
     sfx('hurt');
     this.floatText(this.player.x, this.player.y - 28, fmt(dmg), '#ff5a5a');
     this.player.setTintFill(0xff6a6a);
-    this.cameras.main.shake(60, 0.0008);  // 被弾時の揺れは控えめに(酔い防止)
+    this.cameras.main.shake(60, 0.00036);  // 被弾時の揺れは控えめに(酔い防止)
     // ノックバック: 敵から離れる方向へ押される。スタンス成功時はのけぞらない
     const resisted = Math.random() < stanceChance(this.progress.charKey, this.progress.level);
     if (resisted) {
