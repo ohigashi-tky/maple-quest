@@ -80,6 +80,7 @@ export default class GameScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Sprite;
   private weapon!: Phaser.GameObjects.Sprite;  // 転職ごとに大型化する武器(鉾/杖)
   private weaponSwingUntil = 0;                // 攻撃時の振りモーション終了時刻
+  private weaponHiddenUntil = 0;               // ピアスサイクロン中は手持ち武器を隠す
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private playerShots!: Phaser.Physics.Arcade.Group;
   private enemyShots!: Phaser.Physics.Arcade.Group;
@@ -406,7 +407,7 @@ export default class GameScene extends Phaser.Scene {
     const target = swinging ? swingAngle : restAngle;
     const cur = this.weapon.angle;
     this.weapon.setAngle(cur + (target - cur) * (swinging ? 0.5 : 0.25));
-    this.weapon.setVisible(this.player.visible);
+    this.weapon.setVisible(this.player.visible && this.time.now >= this.weaponHiddenUntil);
     this.weapon.setAlpha(this.player.alpha);
   }
 
@@ -1011,7 +1012,8 @@ export default class GameScene extends Phaser.Scene {
       case 'darkcross': return 800;
       case 'meteor': case 'nova': return 650;
       case 'gungnir': return 180 + s.hits * 70 + 120;
-      case 'channel': case 'breath': return s.durMs ?? 5000;
+      case 'channel': return 400;  // ピアスサイクロンは常駐型: 回転中も他スキル使用可
+      case 'breath': return s.durMs ?? 5000;
       default: return 450;
     }
   }
@@ -1024,18 +1026,22 @@ export default class GameScene extends Phaser.Scene {
     this.channelUntil = end;
     sfx('cyclone');
     const radius = s.range ?? 80;
-    // うずまきのビジュアル(回転するスラッシュ2枚)
-    const vortex1 = this.add.sprite(this.player.x, this.player.y, 'fx_slash_0').setDepth(12).setScale(2.6).setTint(0xb89aff).setAlpha(0.85);
-    const vortex2 = this.add.sprite(this.player.x, this.player.y, 'fx_slash_0').setDepth(12).setScale(2.6).setTint(0xff6ab0).setAlpha(0.7).setFlipX(true);
-    this.tweens.add({ targets: [vortex1, vortex2], angle: 360, duration: 350, repeat: -1 });
+    // 鉾が水平にブンブン回るビジュアル(手持ち武器は隠して回転体に差し替え)
+    this.weaponHiddenUntil = end;
+    const spin = this.add.image(this.player.x, this.player.y - 4, `${this.weaponKey}_0`)
+      .setDepth(12).setOrigin(0.5, 0.5).setScale(this.weaponScale * 1.25).setAngle(90);
+    this.tweens.add({ targets: spin, angle: 90 + 360, duration: 260, repeat: -1 });
+    // 回転の軌跡(薄い円)
+    const trail = this.add.circle(this.player.x, this.player.y - 4, radius * 0.62, 0xb89aff, 0.12)
+      .setDepth(11).setStrokeStyle(2, 0xd8b0ff, 0.4);
     // ダメージ&演出のティック(約140ms毎)
     let tick = 0;
     const ev = this.time.addEvent({
       delay: 140, loop: true,
       callback: () => {
-        if (this.over || this.time.now >= end) { ev.remove(); vortex1.destroy(); vortex2.destroy(); return; }
-        vortex1.setPosition(this.player.x, this.player.y);
-        vortex2.setPosition(this.player.x, this.player.y);
+        if (this.over || this.time.now >= end) { ev.remove(); spin.destroy(); trail.destroy(); this.weaponHiddenUntil = 0; return; }
+        spin.setPosition(this.player.x, this.player.y - 4);
+        trail.setPosition(this.player.x, this.player.y - 4);
         if (tick % 3 === 0) sfx('cyclone');
         tick++;
         // 周囲の風の刃
@@ -1875,7 +1881,7 @@ export default class GameScene extends Phaser.Scene {
     const baseY = e.y - e.displayHeight / 2 - 8;
     const y = baseY - stack * 12;
     // 事前生成したビットマップ数字(黒枠+白枠+グラデーション)をImage合成のみで表示(軽量)
-    const str = fmt(dmg);
+    const str = String(Math.round(dmg));  // カンマ区切りなし
     const c = this.add.container(x, y).setDepth(21);
     const key = crit ? 'dmgfont_c' : 'dmgfont_n';
     const SCALE = 0.25;          // 4倍解像度で焼いてあるため縮小
