@@ -991,6 +991,7 @@ export default class GameScene extends Phaser.Scene {
       case 'summon': this.skSummon(skill); break;
       case 'shadow': this.skShadow(skill); break;
       case 'kunai': this.skKunai(skill); break;
+      case 'darkcross': this.skDarkCross(skill); break;
       case 'heal': this.skHeal(skill); break;
     }
     // 発動モーションが終わるまで他スキルをロック
@@ -1007,6 +1008,7 @@ export default class GameScene extends Phaser.Scene {
       case 'projectile': return (s.proj ?? 2) * 70 + 280;
       case 'thunder': return (s.targets ?? 1) * 70 + 350;
       case 'kunai': case 'darkimpale': return 600;
+      case 'darkcross': return 800;
       case 'meteor': case 'nova': return 650;
       case 'gungnir': return 180 + s.hits * 70 + 120;
       case 'channel': case 'breath': return s.durMs ?? 5000;
@@ -1082,6 +1084,44 @@ export default class GameScene extends Phaser.Scene {
       });
     }
     this.cameras.main.flash(120, 60, 0, 16);
+  }
+
+  // ダークシンセンス: 闇の大きな斜め十字が周囲に多発し、広範囲の敵(最大10体)を10回斬る
+  private skDarkCross(s: SkillDef) {
+    sfx('slashpro');
+    this.cameras.main.shake(220, 0.004);
+    this.cameras.main.flash(140, 70, 0, 90);
+    const radius = s.radius ?? 190;
+    const cx = this.player.x, cy = this.player.y - 6;
+    // 周囲に大きな闇のXが次々と出現
+    for (let k = 0; k < 7; k++) {
+      this.time.delayedCall(k * 90, () => {
+        if (this.over) return;
+        const ox = cx + Phaser.Math.Between(-radius, radius) * 0.8;
+        const oy = cy + Phaser.Math.Between(-60, 30);
+        const sizeW = Phaser.Math.Between(56, 86);
+        // 斜め十字(X): 黒い刃2本 + 紫紅のグロー2本
+        for (const ang of [45, -45]) {
+          const glow = this.add.rectangle(ox, oy, sizeW, 12, 0x9a2ae0, 0.55).setAngle(ang).setDepth(12).setBlendMode(Phaser.BlendModes.ADD).setScale(0.2);
+          const blade = this.add.rectangle(ox, oy, sizeW, 5, 0x12041e, 1).setAngle(ang).setDepth(13).setScale(0.2);
+          this.tweens.add({ targets: [glow, blade], scaleX: 1, scaleY: 1, duration: 110, ease: 'Back.easeOut' });
+          this.tweens.add({ targets: [glow, blade], alpha: 0, duration: 240, delay: 170, onComplete: () => { glow.destroy(); blade.destroy(); } });
+        }
+        // 闇の粒子
+        for (let q = 0; q < 3; q++) {
+          const sp = this.add.rectangle(ox, oy, 3, 3, q % 2 ? 0xc84aff : 0x2a0a44, 1).setDepth(13);
+          this.tweens.add({ targets: sp, x: ox + Phaser.Math.Between(-30, 30), y: oy + Phaser.Math.Between(-30, 30), alpha: 0, duration: 300, onComplete: () => sp.destroy() });
+        }
+        if (k % 3 === 0) sfx('slash');
+      });
+    }
+    // 10回の多段(広範囲・最大10体=範囲内全員)
+    for (let h = 0; h < s.hits; h++) {
+      this.time.delayedCall(80 + h * 64, () => {
+        if (this.over) return;
+        this.aoeDamage(cx, cy, radius, s.mult, 1);
+      });
+    }
   }
 
   // フリージングブレス: キーダウン中(最大5秒)行動不能+完全無敵。前方の敵を多段攻撃し減速デバフ
@@ -1537,22 +1577,23 @@ export default class GameScene extends Phaser.Scene {
   private skChain(s: SkillDef) {
     sfx('thunder');
     this.cameras.main.flash(140, 180, 220, 255);
-    const b = this.boss;
-    if (b && b.active && Math.abs(b.x - this.player.x) < (s.range ?? 160)) {
-      let px = this.player.x, py = this.player.y - 6;
-      // チェーン = ボスに複数回バウンド
-      for (let k = 0; k < (s.targets ?? 6); k++) {
-        this.time.delayedCall(k * 60, () => {
-          if (!b.active) return;
-          const tx = b.x + Phaser.Math.Between(-12, 12), ty = b.y + Phaser.Math.Between(-12, 12);
-          this.lightningLink(px, py, tx, ty);
-          px = tx; py = ty;
-          this.boltFx(tx, ty, 1.4);
-          this.hitEnemy(b, s.mult, s.hits);
-        });
-      }
-    } else {
+    // 名前どおりの連鎖雷: 範囲内の敵(最大targets体)へ次々にバウンドする
+    const inRange = this.aliveBosses().filter((b) => Math.abs(b.x - this.player.x) < (s.range ?? 160));
+    if (!inRange.length) {
       this.boltFx(this.player.x + this.facing * 30, this.player.y);
+      return;
+    }
+    let px = this.player.x, py = this.player.y - 6;
+    for (let k = 0; k < (s.targets ?? 8); k++) {
+      const b = inRange[k % inRange.length];  // 敵が少なければ同じ敵に再バウンド
+      this.time.delayedCall(k * 60, () => {
+        if (!b.active || b.dying) return;
+        const tx = b.x + Phaser.Math.Between(-12, 12), ty = b.y + Phaser.Math.Between(-12, 12);
+        this.lightningLink(px, py, tx, ty);
+        px = tx; py = ty;
+        this.boltFx(tx, ty, 1.4);
+        this.hitEnemy(b, s.mult, s.hits);
+      });
     }
   }
 
@@ -1838,7 +1879,7 @@ export default class GameScene extends Phaser.Scene {
     const c = this.add.container(x, y).setDepth(21);
     const key = crit ? 'dmgfont_c' : 'dmgfont_n';
     const SCALE = 0.25;          // 4倍解像度で焼いてあるため縮小
-    const OVERLAP = 7.5;         // 文字ごとのストローク余白ぶん詰める(表示px)
+    const OVERLAP = 3.5;         // 文字ごとのストローク余白ぶん詰める(表示px)。数字が読めるよう控えめに
     const tex = this.textures.get(key);
     const chars = [...str];
     const ws = chars.map((ch) => tex.get(ch === ',' ? 'comma' : ch).width * SCALE);

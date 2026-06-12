@@ -26,6 +26,7 @@ export type SkillKind =
   | 'summon'     // 召喚獣(エルクィネス/ダークスピリット)
   | 'shadow'     // シャドーパートナー(分身が攻撃を反復)
   | 'kunai'      // 巨大クナイ(闇の大爆発・複数体攻撃)
+  | 'darkcross'  // ダークシンセンス(闇の斜め十字が周囲に多発)
   | 'heal';      // 回復
 
 export interface SkillDef {
@@ -124,8 +125,8 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 100, jobName: 'ダークナイト・極', rankName: '5次', spriteKey: 'warrior5', atkBonus: 2.6,
         skills: [
           { id: 'w5a', name: 'ダークインペール', mp: 3, cd: 900, kind: 'darkimpale', mult: 3.0, hits: 6, range: 76, multi: true },
-          { id: 'w5b', name: 'ガングニールの咆哮', mp: 6, cd: 2200, kind: 'melee', mult: 2.3, hits: 6, range: 80 },
-          { id: 'w5c', name: 'ピアスサイクロン', mp: 7, cd: 2400, kind: 'channel', mult: 1.3, hits: 1, range: 84, durMs: 5000 },
+          { id: 'w5c', name: 'ピアスサイクロン', mp: 6, cd: 2400, kind: 'channel', mult: 1.3, hits: 1, range: 84, durMs: 5000 },
+          { id: 'w5b', name: 'ダークシンセンス', mp: 7, cd: 10000, kind: 'darkcross', mult: 4.0, hits: 10, targets: 10, radius: 190 },
         ],
       },
     ],
@@ -144,7 +145,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 1, jobName: '魔法使い', rankName: '1次', spriteKey: 'mage', atkBonus: 1,
         skills: [
           { id: 'm1a', name: 'エナジーボルト', mp: 1, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
-          { id: 'm1b', name: 'マジッククロー', mp: 2, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: true },
+          { id: 'm1b', name: 'マジッククロー', mp: 2, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
           { id: 'm1c', name: 'マジックガード', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.45 },
         ],
       },
@@ -152,7 +153,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 10, jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.25,
         skills: [
           { id: 'm2a', name: 'コールドビーム', mp: 2, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 900 },
-          { id: 'm2b', name: 'サンダーボルト', mp: 3, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
+          { id: 'm2b', name: 'サンダーボルト', mp: 3, cd: 1500, kind: 'thunder', mult: 1.2, hits: 1, targets: 4, range: 150 },
           { id: 'm2c', name: 'メディテーション', mp: 4, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, atkBuff: 1.45 },
         ],
       },
@@ -167,7 +168,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 60, jobName: 'アークメイジ', rankName: '4次', spriteKey: 'mage4', atkBonus: 2.0,
         skills: [
-          { id: 'm4b', name: 'チェーンライトニング', mp: 3, cd: 1600, kind: 'thunder', mult: 1.9, hits: 1, targets: 4, range: 240 },
+          { id: 'm4b', name: 'チェーンライトニング', mp: 3, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 240 },
           { id: 'm4a', name: 'ブリザード', mp: 4, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 1000 },
           { id: 'm4c', name: 'エルクィネス', mp: 6, cd: 20000, kind: 'summon', mult: 1.5, hits: 3, targets: 3, durMs: 20000 },
         ],
@@ -199,7 +200,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 1, jobName: '盗賊', rankName: '1次', spriteKey: 'thief', atkBonus: 1,
         skills: [
           { id: 't1a', name: 'ラッキーセブン', mp: 2, cd: 700, kind: 'projectile', mult: 1.5, hits: 2, proj: 2, speed: 300, pierce: false },
-          { id: 't1b', name: 'ダブルスタブ', mp: 2, cd: 1200, kind: 'melee', mult: 1.5, hits: 2, range: 44, multi: true },
+          { id: 't1b', name: 'ダブルスタブ', mp: 2, cd: 1200, kind: 'melee', mult: 1.5, hits: 2, range: 44 },
           { id: 't1c', name: 'ニンブルボディ', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.55 },
         ],
       },
