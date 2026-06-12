@@ -80,6 +80,8 @@ export default class GameScene extends Phaser.Scene {
   private progress!: Progress;
 
   private player!: Phaser.Physics.Arcade.Sprite;
+  private weapon!: Phaser.GameObjects.Sprite;  // 転職ごとに大型化する武器(鉾/杖)
+  private weaponSwingUntil = 0;                // 攻撃時の振りモーション終了時刻
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private playerShots!: Phaser.Physics.Arcade.Group;
   private enemyShots!: Phaser.Physics.Arcade.Group;
@@ -357,7 +359,37 @@ export default class GameScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.play(`${this.spriteKey}_stand`);
     this.player.setDepth(10);
+    // 武器オーバーレイ(握り=下端を支点に回転)
+    this.weapon = this.add.sprite(this.player.x, this.player.y, `${this.weaponKey}_0`)
+      .setOrigin(0.5, 0.86).setDepth(11);
+    this.refreshWeapon();
     this.physics.world.setBounds(0, -60, ARENA_W, WORLD_H + 60);
+  }
+
+  // 武器の見た目を現在のティアに合わせて更新
+  private refreshWeapon() {
+    if (!this.weapon) return;
+    this.weapon.setTexture(`${this.weaponKey}_0`).setScale(this.weaponScale);
+  }
+
+  // 武器をプレイヤーの手元へ追従させ、攻撃時に振る
+  private updateWeapon() {
+    if (!this.weapon) return;
+    const dir = this.facing;
+    this.weapon.setFlipX(dir < 0);
+    // 手元の位置(向きで左右反転)
+    const hx = this.player.x + dir * 7;
+    const hy = this.player.y + 6;
+    this.weapon.setPosition(hx, hy);
+    // 通常は穂先を上・前方へ傾けて構える。攻撃中は前方へ振り下ろす
+    const swinging = this.time.now < this.weaponSwingUntil;
+    const restAngle = dir * 18;       // 構え(やや前傾)
+    const swingAngle = dir * 96;      // 振り下ろし
+    const target = swinging ? swingAngle : restAngle;
+    const cur = this.weapon.angle;
+    this.weapon.setAngle(cur + (target - cur) * (swinging ? 0.5 : 0.25));
+    this.weapon.setVisible(this.player.visible);
+    this.weapon.setAlpha(this.player.alpha);
   }
 
   private buildGroups() {
@@ -444,6 +476,15 @@ export default class GameScene extends Phaser.Scene {
   private get charState() { return this.progress.chars[this.progress.charKey]; }
   private get jobTier(): JobTier { return tierFor(this.charDef, this.progress.level); }
   private get spriteKey(): string { return this.jobTier.spriteKey; }
+  // 現在の武器テクスチャキー(転職ティアに応じて1〜5)
+  private get weaponKey(): string {
+    const idx = tierIndexFor(this.charDef, this.progress.level) + 1;
+    return `weap_${this.progress.charKey === 'warrior' ? 'w' : 'm'}${idx}`;
+  }
+  // ティアが上がるほど武器を大きく表示
+  private get weaponScale(): number {
+    return 1.0 + tierIndexFor(this.charDef, this.progress.level) * 0.16;
+  }
   private otherCharSpriteKey(): string {
     const other: CharKey = this.progress.charKey === 'warrior' ? 'mage' : 'warrior';
     return tierFor(CHARACTERS[other], this.progress.level).spriteKey;
@@ -633,7 +674,7 @@ export default class GameScene extends Phaser.Scene {
         const bd = b.body as Phaser.Physics.Arcade.Body;
         if (bd.blocked.down && bd.velocity.y >= 0 && land.getOverallProgress() > 0.1) {
           land.remove();
-          this.cameras.main.shake(180, 0.0035);
+          this.cameras.main.shake(140, 0.0015);
           sfx('thunder');
           this.shockwaveAt(b.x, b.atk, 84 * b.floor.scale);
         }
@@ -705,7 +746,7 @@ export default class GameScene extends Phaser.Scene {
           if (this.over) return;
           const bolt = this.add.image(tx, GROUND_Y - 50, 'fx_bolt_0').setDepth(12).setScale(1.4, 4).setTint(b.floor.tint);
           sfx('thunder');
-          this.cameras.main.shake(110, 0.003);
+          this.cameras.main.shake(90, 0.0013);
           this.tweens.add({ targets: bolt, alpha: 0, duration: 300, onComplete: () => bolt.destroy() });
           if (Math.abs(this.player.x - tx) < 18 && this.player.y > GROUND_Y - 130) this.hurtPlayer(b.atk * 1.05);
         });
@@ -865,6 +906,7 @@ export default class GameScene extends Phaser.Scene {
       case 'chain': this.skChain(skill); break;
       case 'nova': this.skNova(skill); break;
       case 'channel': this.skChannel(skill); break;
+      case 'darkimpale': this.skDarkImpale(skill); break;
       case 'breath': this.skBreath(skill); break;
       case 'gungnir': this.skGungnir(skill); break;
       case 'summon': this.skSummon(skill); break;
@@ -903,6 +945,43 @@ export default class GameScene extends Phaser.Scene {
       },
     });
     this.cameras.main.shake(120, 0.003);
+  }
+
+  // ダークインペール: 上から下へ振り下ろす黒×赤の闇斬撃(300%×6)
+  private skDarkImpale(s: SkillDef) {
+    sfx('slashpro');
+    this.cameras.main.shake(180, 0.005);
+    const dir = this.facing;
+    const cx = this.player.x + dir * 30;
+    const topY = this.player.y - 60;
+    const botY = this.player.y + 18;
+    // 闇のオーラを足元に展開
+    const aura = this.add.ellipse(cx, this.player.y + 14, 90, 26, 0x16040c, 0.55).setDepth(8);
+    this.tweens.add({ targets: aura, scaleX: 1.4, alpha: 0, duration: 420, onComplete: () => aura.destroy() });
+    // 6本の振り下ろし斬撃を時間差で
+    for (let k = 0; k < s.hits; k++) {
+      this.time.delayedCall(k * 70, () => {
+        const ox = dir * Phaser.Math.Between(-8, 30);
+        // 黒い刃(縦長) + 赤いグロー
+        const glow = this.add.rectangle(cx + ox, topY, 10, 0, 0xff2a3a, 0.9).setDepth(12).setOrigin(0.5, 0);
+        const blade = this.add.rectangle(cx + ox, topY, 5, 0, 0x1a0010, 1).setDepth(13).setOrigin(0.5, 0);
+        glow.setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({
+          targets: [glow, blade], height: botY - topY, duration: 110, ease: 'Quad.easeIn',
+          onComplete: () => {
+            // 着弾の飛沫
+            for (let p = 0; p < 4; p++) {
+              const sp = this.add.rectangle(cx + ox, botY, 3, 3, p % 2 ? 0xff2a3a : 0x2a0014, 1).setDepth(13);
+              this.tweens.add({ targets: sp, x: sp.x + Phaser.Math.Between(-20, 20), y: sp.y + Phaser.Math.Between(-14, 4), alpha: 0, duration: 260, onComplete: () => sp.destroy() });
+            }
+            this.tweens.add({ targets: [glow, blade], alpha: 0, duration: 90, onComplete: () => { glow.destroy(); blade.destroy(); } });
+          },
+        });
+        // 1段ごとにダメージ
+        this.meleeHit(s.range ?? 76, s.mult, 1);
+      });
+    }
+    this.cameras.main.flash(120, 60, 0, 16);
   }
 
   // フリージングブレス: キーダウン中(最大5秒)行動不能+完全無敵。前方の敵を多段攻撃し減速デバフ
@@ -1399,6 +1478,7 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: fx, radius: 30, alpha: 0, duration: 300, onUpdate: () => fx.setRadius(fx.radius), onComplete: () => fx.destroy() });
     this.player.setTexture(`${this.spriteKey}_0`);
     this.player.play(`${this.spriteKey}_stand`);
+    this.refreshWeapon();
     this.buildUiState();
   }
 
@@ -1408,6 +1488,7 @@ export default class GameScene extends Phaser.Scene {
   private playAttackAnim() {
     const key = this.spriteKey;
     this.player.play(`${key}_attack`, true);
+    this.weaponSwingUntil = this.time.now + 160;  // 武器を前方へ振る
     this.time.delayedCall(220, () => {
       if (this.player.anims.currentAnim?.key === `${key}_attack`) this.player.play(`${key}_stand`, true);
     });
@@ -1534,14 +1615,14 @@ export default class GameScene extends Phaser.Scene {
     // クリティカルは赤く大きく太い(メイプル風・びっくりマークなし)
     const t = this.add.text(x, y, fmt(dmg), {
       fontFamily: '"Arial Black", sans-serif',
-      fontSize: crit ? '17px' : '11px',
+      fontSize: crit ? '15px' : '14px',
       fontStyle: 'bold',
       color: crit ? '#ff2a2a' : '#ffffff',
       stroke: crit ? '#5a0606' : '#a8500a',
-      strokeThickness: crit ? 5 : 3,
+      strokeThickness: crit ? 5 : 4,
     }).setOrigin(0.5).setDepth(21).setResolution(4);
     t.setScale(0.4);
-    this.tweens.add({ targets: t, scale: crit ? 1.35 : 1, duration: 130, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, scale: crit ? 1.12 : 1, duration: 130, ease: 'Back.easeOut' });
     // flatは短めに消えて次々重なる
     const fade = flat ? 520 : 900;
     this.tweens.add({ targets: t, y: y - 14, alpha: 0, duration: fade, delay: flat ? 60 : 200, ease: 'Quad.easeOut', onComplete: () => t.destroy() });
@@ -1655,7 +1736,7 @@ export default class GameScene extends Phaser.Scene {
     sfx('hurt');
     this.floatText(this.player.x, this.player.y - 28, fmt(dmg), '#ff5a5a');
     this.player.setTintFill(0xff6a6a);
-    this.cameras.main.shake(70, 0.0022);
+    this.cameras.main.shake(60, 0.0008);  // 被弾時の揺れは控えめに(酔い防止)
     // ノックバック: 敵から離れる方向へ押される。スタンス成功時はのけぞらない
     const resisted = Math.random() < stanceChance(this.progress.charKey, this.progress.level);
     if (resisted) {
@@ -1664,7 +1745,8 @@ export default class GameScene extends Phaser.Scene {
     } else {
       const src = this.boss && this.boss.active ? this.boss.x : this.player.x - this.facing * 10;
       const kbDir = Math.sign(this.player.x - src) || -this.facing || 1;
-      this.player.setVelocity(kbDir * 150, -130);
+      // 少しだけ後ろ方向へ。大きくのけぞらない
+      this.player.setVelocity(kbDir * 70, -45);
     }
     this.time.delayedCall(120, () => this.player.clearTint());
     this.tweens.add({ targets: this.player, alpha: 0.35, duration: 100, yoyo: true, repeat: 4, onComplete: () => this.player.setAlpha(1) });
@@ -1746,6 +1828,7 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.flash(500, 255, 244, 200);
     this.player.setTexture(`${tier.spriteKey}_0`);
     this.player.play(`${tier.spriteKey}_stand`, true);
+    this.refreshWeapon();
     this.hud()?.showBanner(`${tier.rankName}転職! 「${tier.jobName}」にジョブアップ!`, '#ffd24a');
     this.buildUiState();
   }
@@ -1782,6 +1865,7 @@ export default class GameScene extends Phaser.Scene {
     this.updateShots();
     this.updatePickups();
     this.updateSummons();
+    this.updateWeapon();
     if (!this.infinite) this.updatePortal();
     this.syncUiState();
   }

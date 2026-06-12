@@ -20,6 +20,7 @@ export type SkillKind =
   | 'meteor'     // 隕石/ブリザード(降下多段)
   | 'nova'       // 全画面多段
   | 'channel'    // キーダウン継続発動(ピアスサイクロン)
+  | 'darkimpale' // 振り下ろし型の闇斬撃(黒×赤)
   | 'breath'     // キーダウン氷ブレス(無敵+減速デバフ)
   | 'gungnir'    // 神槍投擲(最大HP比例の多段)
   | 'summon'     // 召喚獣(エルクィネス/ダークスピリット)
@@ -86,41 +87,41 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 1, jobName: '剣士', rankName: '1次', spriteKey: 'warrior', atkBonus: 1,
         skills: [
-          { id: 'w1a', name: 'パワーストライク', mp: 4, cd: 700, kind: 'melee', mult: 1.6, hits: 2, range: 40 },
-          { id: 'w1b', name: 'スラッシュブラスト', mp: 6, cd: 1400, kind: 'aoe', mult: 1.2, hits: 2, radius: 66 },
-          { id: 'w1c', name: 'アイアンボディ', mp: 7, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.5 },
+          { id: 'w1a', name: 'パワーストライク', mp: 2, cd: 700, kind: 'melee', mult: 1.6, hits: 2, range: 40 },
+          { id: 'w1b', name: 'スラッシュブラスト', mp: 3, cd: 1400, kind: 'aoe', mult: 1.2, hits: 2, radius: 66 },
+          { id: 'w1c', name: 'アイアンボディ', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.5 },
         ],
       },
       {
         minLevel: 10, jobName: 'スピアマン', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.25,
         skills: [
-          { id: 'w2a', name: 'スピアクラッシュ', mp: 4, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
-          { id: 'w2b', name: 'ファイナルアタック', mp: 7, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
-          { id: 'w2c', name: 'ハイパーボディ', mp: 10, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, hpBuff: 1.6, defCut: 0.85 },
+          { id: 'w2a', name: 'スピアクラッシュ', mp: 2, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
+          { id: 'w2b', name: 'ファイナルアタック', mp: 3, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
+          { id: 'w2c', name: 'ハイパーボディ', mp: 5, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, hpBuff: 1.6, defCut: 0.85 },
         ],
       },
       {
         minLevel: 30, jobName: 'ドラゴンナイト', rankName: '3次', spriteKey: 'warrior3', atkBonus: 1.55,
         skills: [
-          { id: 'w3a', name: 'ドラゴンバスター', mp: 5, cd: 800, kind: 'melee', mult: 1.7, hits: 4, range: 56 },
-          { id: 'w3b', name: 'ドラゴンフューリー', mp: 8, cd: 1700, kind: 'aoe', mult: 1.5, hits: 4, radius: 90 },
-          { id: 'w3c', name: 'ドラゴンブラッド', mp: 11, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, atkBuff: 1.6 },
+          { id: 'w3a', name: 'ドラゴンバスター', mp: 2, cd: 800, kind: 'melee', mult: 1.7, hits: 4, range: 56 },
+          { id: 'w3b', name: 'ドラゴンフューリー', mp: 4, cd: 1700, kind: 'aoe', mult: 1.5, hits: 4, radius: 90 },
+          { id: 'w3c', name: 'ドラゴンブラッド', mp: 5, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, atkBuff: 1.6 },
         ],
       },
       {
         minLevel: 60, jobName: 'ダークナイト', rankName: '4次', spriteKey: 'warrior4', atkBonus: 2.0,
         skills: [
-          { id: 'w4a', name: 'サウザンドスピア', mp: 6, cd: 850, kind: 'melee', mult: 1.6, hits: 6, range: 62 },
-          { id: 'w4b', name: 'グングニル', mp: 14, cd: 4500, kind: 'gungnir', mult: 2.25, hits: 12, targets: 3 },
-          { id: 'w4c', name: 'ダークスピリット', mp: 14, cd: 30000, kind: 'summon', mult: 1.3, hits: 3, durMs: 30000 },
+          { id: 'w4a', name: 'サウザンドスピア', mp: 3, cd: 850, kind: 'melee', mult: 1.6, hits: 6, range: 62 },
+          { id: 'w4b', name: 'グングニル', mp: 7, cd: 4500, kind: 'gungnir', mult: 2.25, hits: 12, targets: 3 },
+          { id: 'w4c', name: 'ダークスピリット', mp: 7, cd: 30000, kind: 'summon', mult: 1.3, hits: 3, durMs: 30000 },
         ],
       },
       {
         minLevel: 100, jobName: 'ダークナイト・極', rankName: '5次', spriteKey: 'warrior5', atkBonus: 2.6,
         skills: [
-          { id: 'w5a', name: 'ダークインペール', mp: 7, cd: 800, kind: 'melee', mult: 1.9, hits: 8, range: 70 },
-          { id: 'w5b', name: 'ガングニールの咆哮', mp: 13, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
-          { id: 'w5c', name: 'ピアスサイクロン', mp: 14, cd: 2400, kind: 'channel', mult: 1.3, hits: 1, range: 84, durMs: 5000 },
+          { id: 'w5a', name: 'ダークインペール', mp: 3, cd: 900, kind: 'darkimpale', mult: 3.0, hits: 6, range: 76 },
+          { id: 'w5b', name: 'ガングニールの咆哮', mp: 6, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
+          { id: 'w5c', name: 'ピアスサイクロン', mp: 7, cd: 2400, kind: 'channel', mult: 1.3, hits: 1, range: 84, durMs: 5000 },
         ],
       },
     ],
@@ -138,41 +139,41 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 1, jobName: '魔法使い', rankName: '1次', spriteKey: 'mage', atkBonus: 1,
         skills: [
-          { id: 'm1a', name: 'エナジーボルト', mp: 3, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
-          { id: 'm1b', name: 'マジッククロー', mp: 5, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
-          { id: 'm1c', name: 'マジックガード', mp: 6, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.45 },
+          { id: 'm1a', name: 'エナジーボルト', mp: 1, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
+          { id: 'm1b', name: 'マジッククロー', mp: 2, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
+          { id: 'm1c', name: 'マジックガード', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.45 },
         ],
       },
       {
         minLevel: 10, jobName: 'ウィザード', rankName: '2次', spriteKey: 'mage2', atkBonus: 1.25,
         skills: [
-          { id: 'm2a', name: 'コールドビーム', mp: 4, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 900 },
-          { id: 'm2b', name: 'サンダーボルト', mp: 6, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
-          { id: 'm2c', name: 'メディテーション', mp: 8, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, atkBuff: 1.45 },
+          { id: 'm2a', name: 'コールドビーム', mp: 2, cd: 900, kind: 'freeze', mult: 1.6, hits: 2, radius: 70, durMs: 900 },
+          { id: 'm2b', name: 'サンダーボルト', mp: 3, cd: 1500, kind: 'aoe', mult: 1.2, hits: 4, radius: 96 },
+          { id: 'm2c', name: 'メディテーション', mp: 4, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, atkBuff: 1.45 },
         ],
       },
       {
         minLevel: 30, jobName: 'メイジ', rankName: '3次', spriteKey: 'mage3', atkBonus: 1.55,
         skills: [
-          { id: 'm3a', name: 'アイスストライク', mp: 5, cd: 1100, kind: 'freeze', mult: 1.6, hits: 3, radius: 100, durMs: 1100 },
-          { id: 'm3b', name: 'ライトニングボルト', mp: 7, cd: 1500, kind: 'thunder', mult: 1.5, hits: 1, targets: 5, range: 130 },
-          { id: 'm3c', name: 'スペルブースター', mp: 9, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, cdCut: 0.55 },
+          { id: 'm3a', name: 'アイスストライク', mp: 2, cd: 1100, kind: 'freeze', mult: 1.6, hits: 3, radius: 100, durMs: 1100 },
+          { id: 'm3b', name: 'ライトニングボルト', mp: 3, cd: 1500, kind: 'thunder', mult: 1.5, hits: 1, targets: 5, range: 130 },
+          { id: 'm3c', name: 'スペルブースター', mp: 4, cd: 17000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, cdCut: 0.55 },
         ],
       },
       {
         minLevel: 60, jobName: 'アークメイジ', rankName: '4次', spriteKey: 'mage4', atkBonus: 2.0,
         skills: [
-          { id: 'm4a', name: 'ブリザード', mp: 7, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 1000 },
-          { id: 'm4b', name: 'チェーンライトニング', mp: 8, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
-          { id: 'm4c', name: 'エルクィネス', mp: 12, cd: 20000, kind: 'summon', mult: 1.5, hits: 3, targets: 3, durMs: 20000 },
+          { id: 'm4a', name: 'ブリザード', mp: 3, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 1000 },
+          { id: 'm4b', name: 'チェーンライトニング', mp: 4, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
+          { id: 'm4c', name: 'エルクィネス', mp: 6, cd: 20000, kind: 'summon', mult: 1.5, hits: 3, targets: 3, durMs: 20000 },
         ],
       },
       {
         minLevel: 100, jobName: 'アークメイジ・極', rankName: '5次', spriteKey: 'mage5', atkBonus: 2.6,
         skills: [
-          { id: 'm5a', name: 'フリージングブレス', mp: 10, cd: 10000, kind: 'breath', mult: 1.2, hits: 4, targets: 8, range: 200, durMs: 5000 },
-          { id: 'm5b', name: 'サンダーブレイク', mp: 11, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
-          { id: 'm5c', name: 'ブリザードストーム', mp: 13, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 1200 },
+          { id: 'm5a', name: 'フリージングブレス', mp: 5, cd: 10000, kind: 'breath', mult: 1.2, hits: 4, targets: 8, range: 200, durMs: 5000 },
+          { id: 'm5b', name: 'サンダーブレイク', mp: 5, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
+          { id: 'm5c', name: 'ブリザードストーム', mp: 6, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 1200 },
         ],
       },
     ],
