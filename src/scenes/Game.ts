@@ -942,6 +942,7 @@ export default class GameScene extends Phaser.Scene {
     } else if (this.progress.charKey === 'thief') {
       sfx('claw');
       this.shoot(this.shurikenTex, 300, 1.0, false, 90, 1, 1, true);
+      this.shadowThrows();
     } else {
       sfx('claw');
       this.clawFx();
@@ -1178,6 +1179,19 @@ export default class GameScene extends Phaser.Scene {
     return Math.max(0.1, 0.5 - (this.shadowSprites.length - 1) * 0.1);
   }
 
+  // 分身の投擲(見た目): 1体につき1枚だけ薄めに描画(負荷を抑えつつ賑やかさを残す)
+  private shadowThrows() {
+    if (!this.shadowSprites.length || this.time.now >= this.shadowUntil) return;
+    this.shadowSprites.forEach((sp, i) => {
+      this.time.delayedCall(100 + i * 70, () => {
+        if (this.over || !sp.active) return;
+        const img = this.add.image(sp.x + this.facing * 8, sp.y - 4, this.shurikenTex)
+          .setDepth(10).setScale(0.85).setAlpha(0.45).setTint(0xb09ae0);
+        this.tweens.add({ targets: img, x: img.x + this.facing * 210, angle: this.facing * 720, alpha: 0, duration: 620, onComplete: () => img.destroy() });
+      });
+    });
+  }
+
   // 巨大クナイ: 巨大なクナイを投げ、闇の大爆発で複数体を同時攻撃
   private skKunai(s: SkillDef) {
     sfx('slashpro');
@@ -1211,6 +1225,7 @@ export default class GameScene extends Phaser.Scene {
         this.aoeDamage(tx, ty, radius, s.mult, s.hits);
       },
     });
+    this.shadowThrows();
   }
 
   // 召喚: エルクィネス(氷の鳥) / ダークスピリット(黒い魂)
@@ -1439,6 +1454,7 @@ export default class GameScene extends Phaser.Scene {
           this.shoot(this.shurikenTex, s.speed ?? 300, s.mult, s.pierce ?? false, 280, 0.95, hitsPer, true, yOff);
         });
       }
+      this.shadowThrows();  // 影は1体1枚だけ
       return;
     }
     sfx(primary ? 'magicpro' : 'fire');
