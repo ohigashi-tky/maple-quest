@@ -1031,17 +1031,13 @@ export default class GameScene extends Phaser.Scene {
     const spin = this.add.image(this.player.x, this.player.y - 4, `${this.weaponKey}_0`)
       .setDepth(12).setOrigin(0.5, 0.5).setScale(this.weaponScale * 1.25).setAngle(90);
     this.tweens.add({ targets: spin, angle: 90 + 360, duration: 260, repeat: -1 });
-    // 回転の軌跡(薄い円)
-    const trail = this.add.circle(this.player.x, this.player.y - 4, radius * 0.62, 0xb89aff, 0.12)
-      .setDepth(11).setStrokeStyle(2, 0xd8b0ff, 0.4);
     // ダメージ&演出のティック(約140ms毎)
     let tick = 0;
     const ev = this.time.addEvent({
       delay: 140, loop: true,
       callback: () => {
-        if (this.over || this.time.now >= end) { ev.remove(); spin.destroy(); trail.destroy(); this.weaponHiddenUntil = 0; return; }
+        if (this.over || this.time.now >= end) { ev.remove(); spin.destroy(); this.weaponHiddenUntil = 0; return; }
         spin.setPosition(this.player.x, this.player.y - 4);
-        trail.setPosition(this.player.x, this.player.y - 4);
         if (tick % 3 === 0) sfx('cyclone');
         tick++;
         // 周囲の風の刃
@@ -1828,7 +1824,7 @@ export default class GameScene extends Phaser.Scene {
         this.damageNumber(e, dmg, crit, flat);
         const star = this.add.image(e.x, e.y - 6, 'fx_star_0').setDepth(13).setScale(crit ? 1.6 : 1.0);
         this.tweens.add({ targets: star, alpha: 0, scale: 0.3, angle: 90, duration: 240, onComplete: () => star.destroy() });
-        e.setTintFill(crit ? 0xffe45a : 0xffffff);
+        e.setTintFill(crit ? 0xc8b070 : 0xb0acc0);  // 落ち着いた明るさ(眩しさ軽減)
         const titanTint = this.infinite ? 0x8a3acc : e.floor.tint;
         const frozenNow = e.frozenUntil && this.time.now < e.frozenUntil;
         this.time.delayedCall(70, () => e.active && (frozenNow ? e.setTint(0x9ad8ff) : e.setTint(titanTint)));
