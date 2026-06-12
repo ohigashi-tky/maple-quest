@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { createAllTextures, createAllAnims } from '../sprites';
+import { createAllTextures, createAllAnims, createDamageDigits } from '../sprites';
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -9,6 +9,7 @@ export default class BootScene extends Phaser.Scene {
   create() {
     createAllTextures(this);
     createAllAnims(this);
+    createDamageDigits(this);
     this.scene.start('Title');
   }
 }

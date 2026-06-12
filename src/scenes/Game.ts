@@ -103,6 +103,7 @@ export default class GameScene extends Phaser.Scene {
   // 召喚獣が付与する一時バフ(攻撃/防御/クリティカル)
   private sumBuff = { atk: 1, def: 1, crit: 0, until: 0 };
   private inputLockUntil = 0;  // フリージングブレス等で行動不能
+  private castLockUntil = 0;   // スキル発動モーション中は他スキル使用不可
   // 召喚獣(エルクィネス/ダークスピリット)。再詠唱で作り直す
   private summons: Record<string, { sprite: Phaser.GameObjects.Sprite; endAt: number; ev: Phaser.Time.TimerEvent }> = {};
   // シャドーパートナー(盗賊): 分身が本体の攻撃を反復する
@@ -141,6 +142,7 @@ export default class GameScene extends Phaser.Scene {
     this.invulnUntil = 0;
     this.elixirCdUntil = 0;
     this.inputLockUntil = 0;
+    this.castLockUntil = 0;
     this.sumBuff = { atk: 1, def: 1, crit: 0, until: 0 };
     this.summons = {};
     this.shadowUntil = 0;
@@ -953,6 +955,7 @@ export default class GameScene extends Phaser.Scene {
   doSkill(i: number) {
     if (this.over || this.transitioning) return;
     if (this.time.now < this.inputLockUntil) return; // 行動不能中
+    if (this.time.now < this.castLockUntil) return;  // 他スキルの発動モーション中
     const skill = this.jobTier.skills[i];
     if (!skill) return;
     const now = this.time.now;
@@ -989,6 +992,25 @@ export default class GameScene extends Phaser.Scene {
       case 'shadow': this.skShadow(skill); break;
       case 'kunai': this.skKunai(skill); break;
       case 'heal': this.skHeal(skill); break;
+    }
+    // 発動モーションが終わるまで他スキルをロック
+    this.castLockUntil = now + this.castLockFor(skill);
+  }
+
+  // スキル種別ごとの発動モーション時間(この間は他スキル使用不可)
+  private castLockFor(s: SkillDef): number {
+    switch (s.kind) {
+      case 'buff': case 'heal': return 350;
+      case 'summon': case 'shadow': return 450;
+      case 'melee': case 'wave': case 'rush': case 'freeze': return 450;
+      case 'aoe': case 'chain': return 500;
+      case 'projectile': return (s.proj ?? 2) * 70 + 280;
+      case 'thunder': return (s.targets ?? 1) * 70 + 350;
+      case 'kunai': case 'darkimpale': return 600;
+      case 'meteor': case 'nova': return 650;
+      case 'gungnir': return 180 + s.hits * 70 + 120;
+      case 'channel': case 'breath': return s.durMs ?? 5000;
+      default: return 450;
     }
   }
 
@@ -1055,8 +1077,8 @@ export default class GameScene extends Phaser.Scene {
             this.tweens.add({ targets: [glow, blade], alpha: 0, duration: 90, onComplete: () => { glow.destroy(); blade.destroy(); } });
           },
         });
-        // 1段ごとにダメージ
-        this.meleeHit(s.range ?? 76, s.mult, 1);
+        // 1段ごとにダメージ(複数体)
+        this.meleeHit(s.range ?? 76, s.mult, 1, true);
       });
     }
     this.cameras.main.flash(120, 60, 0, 16);
@@ -1111,21 +1133,27 @@ export default class GameScene extends Phaser.Scene {
     sfx('slashpro');
     this.cameras.main.shake(160, 0.004);
     this.cameras.main.flash(160, 220, 230, 255);
-    const b = this.boss;
     const dir = this.facing;
     const maxhp = this.maxHp(this.progress.charKey);
-    // 投げる槍の演出
-    const spear = this.add.rectangle(this.player.x, this.player.y - 4, 30, 5, 0xdfeaff, 1).setDepth(13).setOrigin(0.5);
-    const tx = b && b.active ? b.x : this.player.x + dir * 160;
-    this.tweens.add({ targets: spear, x: tx, duration: 180, onComplete: () => spear.destroy() });
-    // 12回の多段。攻撃ごとに最大HPの110%ぶんダメージ加算
-    for (let k = 0; k < s.hits; k++) {
-      this.time.delayedCall(180 + k * 70, () => {
-        if (!b || !b.active || b.dying) return;
-        const bonus = Math.floor(maxhp * 1.1 * (k + 1)); // 攻撃ごとに増加
-        this.boltFx(b.x + Phaser.Math.Between(-12, 12), b.y, 1.2);
-        this.hitEnemy(b, s.mult, 1, false, bonus);
-      });
+    // 最大targets体(既定3)へ同時に神槍を放つ(複数体攻撃)
+    const targets = this.aliveBosses().slice(0, s.targets ?? 3);
+    if (!targets.length) {
+      const spear = this.add.rectangle(this.player.x, this.player.y - 4, 30, 5, 0xdfeaff, 1).setDepth(13).setOrigin(0.5);
+      this.tweens.add({ targets: spear, x: this.player.x + dir * 160, alpha: 0, duration: 220, onComplete: () => spear.destroy() });
+      return;
+    }
+    for (const b of targets) {
+      const spear = this.add.rectangle(this.player.x, this.player.y - 4, 30, 5, 0xdfeaff, 1).setDepth(13).setOrigin(0.5);
+      this.tweens.add({ targets: spear, x: b.x, y: b.y - 4, duration: 180, onComplete: () => spear.destroy() });
+      // 12回の多段。攻撃ごとに最大HPの110%ぶんダメージ加算
+      for (let k = 0; k < s.hits; k++) {
+        this.time.delayedCall(180 + k * 70, () => {
+          if (!b.active || b.dying) return;
+          const bonus = Math.floor(maxhp * 1.1 * (k + 1)); // 攻撃ごとに増加
+          this.boltFx(b.x + Phaser.Math.Between(-12, 12), b.y, 1.2);
+          this.hitEnemy(b, s.mult, 1, false, bonus);
+        });
+      }
     }
   }
 
@@ -1337,7 +1365,7 @@ export default class GameScene extends Phaser.Scene {
       arc.once('animationcomplete', () => arc.destroy());
       this.cameras.main.shake(70, 0.0025);
     }
-    this.meleeHit(range, s.mult, s.hits);
+    this.meleeHit(range, s.mult, s.hits, !!s.multi);
   }
 
   private skAoe(s: SkillDef) {
@@ -1494,8 +1522,12 @@ export default class GameScene extends Phaser.Scene {
       const ice = this.add.image(cx + Math.cos(ang) * d, cy + Math.sin(ang) * d, 'fx_ice_0').setDepth(13).setScale(0.4).setAlpha(0);
       this.tweens.add({ targets: ice, scale: 1, alpha: 1, duration: 180, yoyo: true, hold: 200, delay: k * 30, onComplete: () => ice.destroy() });
     }
-    const b = this.boss;
-    if (b && b.active && Phaser.Math.Distance.Between(cx, cy, b.x, b.y) < radius + b.displayWidth / 3) {
+    const inRange = this.aliveBosses().filter((b) => Phaser.Math.Distance.Between(cx, cy, b.x, b.y) < radius + b.displayWidth / 3);
+    if (!s.multi && inRange.length > 1) {
+      inRange.sort((a, b2) => Math.abs(a.x - this.player.x) - Math.abs(b2.x - this.player.x));
+      inRange.length = 1;  // 単体スキルは最寄りのみ
+    }
+    for (const b of inRange) {
       this.hitEnemy(b, s.mult, s.hits);
       b.frozenUntil = this.time.now + (s.durMs ?? 2000);
       if (!b.flying && b.body) b.setVelocity(0, 0);
@@ -1687,13 +1719,18 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: t, y: t.y - 12, alpha: 0, duration: 800, onComplete: () => t.destroy() });
   }
 
-  private meleeHit(range: number, mult: number, hits: number) {
-    for (const b of this.aliveBosses()) {
+  private meleeHit(range: number, mult: number, hits: number, all = false) {
+    const candidates = this.aliveBosses().filter((b) => {
       const dx = b.x - this.player.x;
       const inFront = Math.sign(dx) === this.facing || Math.abs(dx) < 14;
-      if (inFront && Math.abs(dx) < range + b.displayWidth / 2.5 && Math.abs(b.y - this.player.y) < 40 + b.displayHeight / 3) {
-        this.hitEnemy(b, mult, hits);
-      }
+      return inFront && Math.abs(dx) < range + b.displayWidth / 2.5 && Math.abs(b.y - this.player.y) < 40 + b.displayHeight / 3;
+    });
+    if (all) {
+      for (const b of candidates) this.hitEnemy(b, mult, hits);
+    } else if (candidates.length) {
+      // 単体スキル: 最も近い1体のみ
+      candidates.sort((a, b2) => Math.abs(a.x - this.player.x) - Math.abs(b2.x - this.player.x));
+      this.hitEnemy(candidates[0], mult, hits);
     }
   }
 
@@ -1796,33 +1833,25 @@ export default class GameScene extends Phaser.Scene {
     const x = e.x + (flat ? Phaser.Math.Between(-7, 7) : (stack % 2 === 0 ? -1 : 1) * Math.min(8, stack * 2));
     const baseY = e.y - e.displayHeight / 2 - 8;
     const y = baseY - stack * 12;
-    // 黒枠の中に白枠、その中にグラデーション文字(クリ=赤/通常=オレンジ、下にいくほど薄く)
+    // 事前生成したビットマップ数字(黒枠+白枠+グラデーション)をImage合成のみで表示(軽量)
     const str = fmt(dmg);
     const c = this.add.container(x, y).setDepth(21);
-    const fontSize = crit ? '15px' : '14px';
-    const back = this.add.text(0, 0, str, {
-      fontFamily: '"Arial Black", sans-serif', fontSize, fontStyle: 'bold',
-      color: '#000000', stroke: '#000000', strokeThickness: 6,
-    }).setOrigin(0.5).setResolution(4);
-    const front = this.add.text(0, 0, str, {
-      fontFamily: '"Arial Black", sans-serif', fontSize, fontStyle: 'bold',
-      color: crit ? '#ff2a2a' : '#ff8a00', stroke: '#ffffff', strokeThickness: 2,
-    }).setOrigin(0.5).setResolution(4);
-    const grad = front.context.createLinearGradient(0, 0, 0, front.canvas.height);
-    if (crit) {
-      grad.addColorStop(0, '#ff1414');
-      grad.addColorStop(0.55, '#ff5050');
-      grad.addColorStop(1, '#ffc0b4');
-    } else {
-      grad.addColorStop(0, '#ff8a00');
-      grad.addColorStop(0.55, '#ffaa3a');
-      grad.addColorStop(1, '#ffe4b4');
-    }
-    front.setFill(grad);
-    c.add([back, front]);
+    const key = crit ? 'dmgfont_c' : 'dmgfont_n';
+    const SCALE = 0.25;          // 4倍解像度で焼いてあるため縮小
+    const OVERLAP = 7.5;         // 文字ごとのストローク余白ぶん詰める(表示px)
+    const tex = this.textures.get(key);
+    const chars = [...str];
+    const ws = chars.map((ch) => tex.get(ch === ',' ? 'comma' : ch).width * SCALE);
+    const total = ws.reduce((a, b) => a + b, 0) - OVERLAP * (chars.length - 1);
+    let cx2 = -total / 2;
+    chars.forEach((ch, i) => {
+      const img = this.add.image(cx2, 0, key, ch === ',' ? 'comma' : ch).setOrigin(0, 0.5).setScale(SCALE);
+      c.add(img);
+      cx2 += ws[i] - OVERLAP;
+    });
     // クリティカル: 数字の左に薄黄色の爆発エフェクト
     if (crit) {
-      const burst = this.add.image(-front.width / 2 - 5, 0, 'fx_star_0').setTint(0xfff2b0).setAlpha(0.95).setScale(0.7);
+      const burst = this.add.image(-total / 2 - 4, 0, 'fx_star_0').setTint(0xfff2b0).setAlpha(0.95).setScale(0.7);
       c.add(burst);
       this.tweens.add({ targets: burst, scale: 1.7, alpha: 0, angle: 50, duration: 330, ease: 'Cubic.easeOut' });
     }

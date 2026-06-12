@@ -41,6 +41,7 @@ export interface SkillDef {
   targets?: number;
   speed?: number;
   pierce?: boolean;
+  multi?: boolean;  // true=複数体攻撃(近接/凍結系で全体に命中)
   proj?: number;    // 投擲数(手裏剣の表示本数)
   healPct?: number;
   durMs?: number;
@@ -99,7 +100,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 10, jobName: 'スピアマン', rankName: '2次', spriteKey: 'warrior2', atkBonus: 1.25,
         skills: [
           { id: 'w2a', name: 'スピアクラッシュ', mp: 2, cd: 750, kind: 'melee', mult: 1.5, hits: 3, range: 46 },
-          { id: 'w2b', name: 'ファイナルアタック', mp: 3, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 50 },
+          { id: 'w2b', name: 'ファイナルアタック', mp: 3, cd: 1600, kind: 'melee', mult: 1.7, hits: 4, range: 56, multi: true },
           { id: 'w2c', name: 'ハイパーボディ', mp: 5, cd: 16000, kind: 'buff', mult: 0, hits: 0, durMs: 14000, hpBuff: 1.6, defCut: 0.85 },
         ],
       },
@@ -122,8 +123,8 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 100, jobName: 'ダークナイト・極', rankName: '5次', spriteKey: 'warrior5', atkBonus: 2.6,
         skills: [
-          { id: 'w5a', name: 'ダークインペール', mp: 3, cd: 900, kind: 'darkimpale', mult: 3.0, hits: 6, range: 76 },
-          { id: 'w5b', name: 'ガングニールの咆哮', mp: 6, cd: 2200, kind: 'nova', mult: 2.0, hits: 6 },
+          { id: 'w5a', name: 'ダークインペール', mp: 3, cd: 900, kind: 'darkimpale', mult: 3.0, hits: 6, range: 76, multi: true },
+          { id: 'w5b', name: 'ガングニールの咆哮', mp: 6, cd: 2200, kind: 'melee', mult: 2.3, hits: 6, range: 80 },
           { id: 'w5c', name: 'ピアスサイクロン', mp: 7, cd: 2400, kind: 'channel', mult: 1.3, hits: 1, range: 84, durMs: 5000 },
         ],
       },
@@ -143,7 +144,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 1, jobName: '魔法使い', rankName: '1次', spriteKey: 'mage', atkBonus: 1,
         skills: [
           { id: 'm1a', name: 'エナジーボルト', mp: 1, cd: 750, kind: 'projectile', mult: 1.7, hits: 1, speed: 230, pierce: false },
-          { id: 'm1b', name: 'マジッククロー', mp: 2, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: false },
+          { id: 'm1b', name: 'マジッククロー', mp: 2, cd: 900, kind: 'projectile', mult: 1.3, hits: 2, speed: 260, pierce: true },
           { id: 'm1c', name: 'マジックガード', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.45 },
         ],
       },
@@ -166,17 +167,17 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
       {
         minLevel: 60, jobName: 'アークメイジ', rankName: '4次', spriteKey: 'mage4', atkBonus: 2.0,
         skills: [
-          { id: 'm4a', name: 'ブリザード', mp: 3, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 1000 },
-          { id: 'm4b', name: 'チェーンライトニング', mp: 4, cd: 1600, kind: 'chain', mult: 1.9, hits: 1, targets: 8, range: 170 },
+          { id: 'm4b', name: 'チェーンライトニング', mp: 3, cd: 1600, kind: 'thunder', mult: 1.9, hits: 1, targets: 4, range: 240 },
+          { id: 'm4a', name: 'ブリザード', mp: 4, cd: 1900, kind: 'meteor', mult: 1.7, hits: 5, targets: 6, durMs: 1000 },
           { id: 'm4c', name: 'エルクィネス', mp: 6, cd: 20000, kind: 'summon', mult: 1.5, hits: 3, targets: 3, durMs: 20000 },
         ],
       },
       {
         minLevel: 100, jobName: 'アークメイジ・極', rankName: '5次', spriteKey: 'mage5', atkBonus: 2.6,
         skills: [
+          { id: 'm5b', name: 'サンダーブレイク', mp: 4, cd: 2000, kind: 'thunder', mult: 1.9, hits: 1, targets: 6, range: 260 },
+          { id: 'm5c', name: 'ブリザードストーム', mp: 5, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 1200 },
           { id: 'm5a', name: 'フリージングブレス', mp: 5, cd: 10000, kind: 'breath', mult: 1.2, hits: 4, targets: 8, range: 200, durMs: 5000 },
-          { id: 'm5b', name: 'サンダーブレイク', mp: 5, cd: 2000, kind: 'nova', mult: 1.9, hits: 6 },
-          { id: 'm5c', name: 'ブリザードストーム', mp: 6, cd: 2400, kind: 'meteor', mult: 1.8, hits: 7, targets: 8, durMs: 1200 },
         ],
       },
     ],
@@ -198,7 +199,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 1, jobName: '盗賊', rankName: '1次', spriteKey: 'thief', atkBonus: 1,
         skills: [
           { id: 't1a', name: 'ラッキーセブン', mp: 2, cd: 700, kind: 'projectile', mult: 1.5, hits: 2, proj: 2, speed: 300, pierce: false },
-          { id: 't1b', name: 'ダブルスタブ', mp: 2, cd: 1200, kind: 'melee', mult: 1.5, hits: 2, range: 38 },
+          { id: 't1b', name: 'ダブルスタブ', mp: 2, cd: 1200, kind: 'melee', mult: 1.5, hits: 2, range: 44, multi: true },
           { id: 't1c', name: 'ニンブルボディ', mp: 3, cd: 12000, kind: 'buff', mult: 0, hits: 0, durMs: 10000, defCut: 0.55 },
         ],
       },
@@ -206,7 +207,7 @@ export const CHARACTERS: Record<CharKey, CharDef> = {
         minLevel: 10, jobName: 'アサシン', rankName: '2次', spriteKey: 'thief2', atkBonus: 1.25,
         skills: [
           { id: 't2a', name: 'トリプルスロー', mp: 2, cd: 750, kind: 'projectile', mult: 1.6, hits: 3, proj: 3, speed: 320, pierce: false },
-          { id: 't2b', name: 'シャドーウェブ', mp: 3, cd: 1600, kind: 'freeze', mult: 1.4, hits: 2, radius: 80, durMs: 900 },
+          { id: 't2b', name: 'シャドーウェブ', mp: 3, cd: 1600, kind: 'freeze', mult: 1.4, hits: 2, radius: 80, durMs: 900, multi: true },
           { id: 't2c', name: 'シャドーパートナー', mp: 5, cd: 30000, kind: 'shadow', mult: 0, hits: 0, targets: 1, durMs: 30000 },
         ],
       },

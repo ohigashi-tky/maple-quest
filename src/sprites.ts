@@ -2495,6 +2495,60 @@ export function createAllTextures(scene: Phaser.Scene) {
   makeTile(scene, 'tile_void', 'void');
 }
 
+// ============================================================
+// ダメージ数字のビットマップフォント事前生成
+// 黒枠+白枠+グラデーション文字(通常=オレンジ/クリ=赤)を4倍解像度で焼き込み、
+// 実行時はImage合成のみにして毎ヒットのCanvas描画コストを無くす。
+// ============================================================
+export function createDamageDigits(scene: Phaser.Scene) {
+  const CHARS = '0123456789,';
+  const make = (key: string, crit: boolean) => {
+    if (scene.textures.exists(key)) return;
+    const size = crit ? 60 : 56;  // 15px/14px の4倍
+    const backs: Phaser.GameObjects.Text[] = [];
+    const fronts: Phaser.GameObjects.Text[] = [];
+    let totalW = 0, maxH = 0;
+    for (const ch of CHARS) {
+      const back = scene.add.text(-9999, -9999, ch, {
+        fontFamily: '"Arial Black", sans-serif', fontSize: `${size}px`, fontStyle: 'bold',
+        color: '#000000', stroke: '#000000', strokeThickness: 24,
+      });
+      const front = scene.add.text(-9999, -9999, ch, {
+        fontFamily: '"Arial Black", sans-serif', fontSize: `${size}px`, fontStyle: 'bold',
+        color: crit ? '#ff2a2a' : '#ff8a00', stroke: '#ffffff', strokeThickness: 8,
+      });
+      const grad = front.context.createLinearGradient(0, 0, 0, front.canvas.height);
+      if (crit) {
+        grad.addColorStop(0, '#ff1414'); grad.addColorStop(0.55, '#ff5050'); grad.addColorStop(1, '#ffc0b4');
+      } else {
+        grad.addColorStop(0, '#ff8a00'); grad.addColorStop(0.55, '#ffaa3a'); grad.addColorStop(1, '#ffe4b4');
+      }
+      front.setFill(grad);
+      backs.push(back); fronts.push(front);
+      totalW += Math.ceil(Math.max(back.width, front.width));
+      maxH = Math.max(maxH, Math.ceil(Math.max(back.height, front.height)));
+    }
+    const rt = scene.add.renderTexture(-9999, -9999, totalW, maxH).setOrigin(0);
+    let x = 0;
+    const frames: [string, number, number][] = [];
+    CHARS.split('').forEach((ch, i) => {
+      const w = Math.ceil(Math.max(backs[i].width, fronts[i].width));
+      rt.draw(backs[i], x + (w - backs[i].width) / 2, (maxH - backs[i].height) / 2);
+      rt.draw(fronts[i], x + (w - fronts[i].width) / 2, (maxH - fronts[i].height) / 2);
+      frames.push([ch === ',' ? 'comma' : ch, x, w]);
+      x += w;
+    });
+    rt.saveTexture(key);
+    const tex = scene.textures.get(key);
+    for (const [name, fx, fw] of frames) tex.add(name, 0, fx, 0, fw, maxH);
+    backs.forEach((t) => t.destroy());
+    fronts.forEach((t) => t.destroy());
+    rt.destroy();  // saveTexture済みのテクスチャは破棄されない
+  };
+  make('dmgfont_n', false);
+  make('dmgfont_c', true);
+}
+
 export function createAllAnims(scene: Phaser.Scene) {
   const mk = (
     key: string,
