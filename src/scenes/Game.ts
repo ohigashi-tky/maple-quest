@@ -942,7 +942,6 @@ export default class GameScene extends Phaser.Scene {
     } else if (this.progress.charKey === 'thief') {
       sfx('claw');
       this.shoot(this.shurikenTex, 300, 1.0, false, 90, 1, 1, true);
-      this.shadowThrows();
     } else {
       sfx('claw');
       this.clawFx();
@@ -1179,19 +1178,6 @@ export default class GameScene extends Phaser.Scene {
     return Math.max(0.1, 0.5 - (this.shadowSprites.length - 1) * 0.1);
   }
 
-  // 分身も同じ手裏剣を投げる(見た目用。ダメージは分身エコーで計上済み)
-  private shadowThrows(yOff = 0) {
-    if (!this.shadowSprites.length || this.time.now >= this.shadowUntil) return;
-    this.shadowSprites.forEach((sp, i) => {
-      this.time.delayedCall(90 + i * 60, () => {
-        if (this.over || !sp.active) return;
-        const img = this.add.image(sp.x + this.facing * 8, sp.y - 4 + yOff, this.shurikenTex)
-          .setDepth(10).setScale(0.85).setAlpha(0.5).setTint(0xb09ae0);
-        this.tweens.add({ targets: img, x: img.x + this.facing * 210, angle: this.facing * 720, alpha: 0, duration: 620, onComplete: () => img.destroy() });
-      });
-    });
-  }
-
   // 巨大クナイ: 巨大なクナイを投げ、闇の大爆発で複数体を同時攻撃
   private skKunai(s: SkillDef) {
     sfx('slashpro');
@@ -1225,7 +1211,6 @@ export default class GameScene extends Phaser.Scene {
         this.aoeDamage(tx, ty, radius, s.mult, s.hits);
       },
     });
-    this.shadowThrows();
   }
 
   // 召喚: エルクィネス(氷の鳥) / ダークスピリット(黒い魂)
@@ -1452,7 +1437,6 @@ export default class GameScene extends Phaser.Scene {
           if (this.over) return;
           const yOff = (k - (throws - 1) / 2) * 8;
           this.shoot(this.shurikenTex, s.speed ?? 300, s.mult, s.pierce ?? false, 280, 0.95, hitsPer, true, yOff);
-          this.shadowThrows(yOff);  // 影も同じ本数を投げる
         });
       }
       return;
@@ -1802,11 +1786,11 @@ export default class GameScene extends Phaser.Scene {
     const fontSize = crit ? '15px' : '14px';
     const back = this.add.text(0, 0, str, {
       fontFamily: '"Arial Black", sans-serif', fontSize, fontStyle: 'bold',
-      color: '#000000', stroke: '#000000', strokeThickness: 8,
+      color: '#000000', stroke: '#000000', strokeThickness: 6,
     }).setOrigin(0.5).setResolution(4);
     const front = this.add.text(0, 0, str, {
       fontFamily: '"Arial Black", sans-serif', fontSize, fontStyle: 'bold',
-      color: crit ? '#ff2a2a' : '#ff8a00', stroke: '#ffffff', strokeThickness: 4,
+      color: crit ? '#ff2a2a' : '#ff8a00', stroke: '#ffffff', strokeThickness: 2,
     }).setOrigin(0.5).setResolution(4);
     const grad = front.context.createLinearGradient(0, 0, 0, front.canvas.height);
     if (crit) {
